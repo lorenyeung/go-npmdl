@@ -1,6 +1,8 @@
 package helpers
 
-import "log"
+import (
+	"log"
+)
 
 //Check logger for errors
 func Check(e error, panic bool, logs string) {

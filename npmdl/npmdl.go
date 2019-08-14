@@ -1,10 +1,10 @@
 package main
 
 import (
-	"files/helpers"
 	"fmt"
 	"log"
 	"npm-downloader/auth"
+	"npm-downloader/helpers"
 	"os"
 	"os/user"
 )
@@ -38,4 +38,19 @@ func main() {
 	var workers = argsWithoutProg[0]
 	log.Printf(configPath, workers)
 
+}
+
+func getJSONList(configPath string) {
+	if _, err := os.Stat(configPath + "all-npm.json"); os.IsNotExist(err) {
+		log.Println("No all-npm.json found")
+		auth.GetRestAPI("https://replicate.npmjs.com/_all_docs", "", "", configPath+"all-npm.json")
+	}
+}
+
+func getList(configPath string) {
+	if _, err := os.Stat(configPath + "all-npm-id.txt"); os.IsNotExist(err) {
+		log.Println("No all-npm-id.txt found")
+		err = os.Mkdir(configPath, 0700)
+		Check(err, true, "Generating "+configPath+" directory")
+	}
 }

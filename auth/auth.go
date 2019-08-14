@@ -9,8 +9,8 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
-	"files/helpers"
 	"fmt"
+	"go-npmdl/helpers"
 	"io"
 	"io/ioutil"
 	"log"
@@ -151,23 +151,23 @@ func GetRestAPI(urlInput, userName, apiKey, filepath string) []byte {
 
 		if filepath != "" {
 			//download percent logger
-			sourceSha256 := string(resp.Header["X-Checksum-Sha256"][0])
+			//sourceSha256 := string(resp.Header["X-Checksum-Sha256"][0])
 			fmt.Println(resp.Header["Content-Disposition"][0])
 			// Create the file
 			out, err := os.Create(filepath)
 			helpers.Check(err, false, "File create")
 			defer out.Close()
 
-			done := make(chan int64)
-			go helpers.PrintDownloadPercent(done, filepath, int64(resp.ContentLength))
+			// done := make(chan int64)
+			// go helpers.PrintDownloadPercent(done, filepath, int64(resp.ContentLength))
 			_, err = io.Copy(out, resp.Body)
 			helpers.Check(err, true, "The file copy")
-			log.Println("Checking downloaded Shasum's match")
-			fileSha256 := helpers.ComputeSha256(filepath)
-			if sourceSha256 != fileSha256 {
-				fmt.Printf("Shasums do not match. Source: %s filesystem %s\n", sourceSha256, fileSha256)
-			}
-			log.Println("Shasums match.")
+			// log.Println("Checking downloaded Shasum's match")
+			// fileSha256 := helpers.ComputeSha256(filepath)
+			// if sourceSha256 != fileSha256 {
+			// 	fmt.Printf("Shasums do not match. Source: %s filesystem %s\n", sourceSha256, fileSha256)
+			// }
+			// log.Println("Shasums match.")
 
 		} else {
 			data, _ := ioutil.ReadAll(resp.Body)
