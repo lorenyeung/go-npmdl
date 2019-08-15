@@ -31,7 +31,7 @@ type Creds struct {
 // VerifyAPIKey for errors
 func VerifyAPIKey(urlInput, userName, apiKey string) bool {
 	log.Printf("starting VerifyAPIkey request. Testing: %s\n", userName)
-	data := GetRestAPI(urlInput+"/api/system/ping", userName, apiKey, "")
+	data := GetRestAPI(true, urlInput+"/api/system/ping", userName, apiKey, "")
 	if string(data) == "OK" {
 		log.Printf("finished VerifyAPIkey request. Credentials are good to go.")
 		return true
@@ -70,13 +70,7 @@ func GenerateDownloadJSON(configPath string, regen bool, masterKey string) Creds
 			fmt.Print("Something seems wrong, please try again. Enter your url: ")
 		}
 	}
-	//TODO need to check if directory exists and/or valid directory. trim trailing /
-	fmt.Printf("Enter your Download location [%s]: ", creds.DlLocation)
-	dlLocationInput, _ := reader.ReadString('\n')
-	dlLocationInput = strings.TrimSuffix(dlLocationInput, "\n")
-	if dlLocationInput == "" {
-		dlLocationInput = creds.DlLocation
-	}
+	dlLocationInput := configPath
 
 	//TODO need to check if repo exists. trim trailing /
 	fmt.Printf("Enter your repository [%s]: ", creds.Repository)
@@ -137,10 +131,12 @@ func GetDownloadJSON(fileLocation string, masterKey string) Creds {
 }
 
 //GetRestAPI GET rest APIs response with error handling
-func GetRestAPI(urlInput, userName, apiKey, filepath string) []byte {
+func GetRestAPI(auth bool, urlInput, userName, apiKey, filepath string) []byte {
 	client := http.Client{}
 	req, err := http.NewRequest("GET", urlInput, nil)
-	req.SetBasicAuth(userName, apiKey)
+	if auth {
+		req.SetBasicAuth(userName, apiKey)
+	}
 	if err != nil {
 		fmt.Printf("The HTTP request failed with error %s\n", err)
 	} else {
@@ -152,7 +148,7 @@ func GetRestAPI(urlInput, userName, apiKey, filepath string) []byte {
 		if filepath != "" {
 			//download percent logger
 			//sourceSha256 := string(resp.Header["X-Checksum-Sha256"][0])
-			fmt.Println(resp.Header["Content-Disposition"][0])
+			//fmt.Println(resp.Header["Content-Disposition"][0])
 			// Create the file
 			out, err := os.Create(filepath)
 			helpers.Check(err, false, "File create")
