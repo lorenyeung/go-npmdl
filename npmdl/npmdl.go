@@ -13,6 +13,7 @@ import (
 	"os/user"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 //NpmIds lol
@@ -35,9 +36,9 @@ func main() {
 	argsWithoutProg := os.Args[1:]
 	configFolder := "/.lorenygo/npmdownloader/"
 	configPath := usr.HomeDir + configFolder
-	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+	if _, err := os.Stat(configPath + "downloads/"); os.IsNotExist(err) {
 		log.Println("No config folder found")
-		err = os.MkdirAll(configPath, 0700)
+		err = os.MkdirAll(configPath+"downloads/", 0700)
 		helpers.Check(err, true, "Generating "+configPath+" directory")
 	}
 
@@ -58,10 +59,35 @@ func main() {
 	defer file.Close()
 
 	scanner := bufio.NewScanner(file)
+
+	intWorkers, _ := strconv.Atoi(workers)
+	//var mutex = &sync.Mutex{} //should help with the concurrent map writes issue
+	var ch = make(chan []string, intWorkers+1)
+	var wg sync.WaitGroup //multi threading the GET details request
+	wg.Add(intWorkers)
+	for i := 0; i < intWorkers; i++ {
+		go func(i int) {
+			for {
+				s, ok := <-ch
+				if !ok { // if there is nothing to do and the channel has been closed then end the goroutine
+					wg.Done()
+					return
+				}
+				log.Printf("Worker %d", i)
+				metadata.GetNPMMetadata(creds, creds.URL+"/api/npm/"+creds.Repository+"/", s[0], s[1], configPath)
+			}
+		}(i)
+	}
+
+	// Now the jobs can be added to the channel, which is used as a queue
 	for scanner.Scan() {
 		s := strings.Fields(scanner.Text())
-		metadata.GetNPMMetadata(creds, creds.URL+"/api/npm/"+creds.Repository+"/", s[1])
+		ch <- s
 	}
+
+	close(ch) // This tells the goroutines there's nothing else to do
+	wg.Wait() // Wait for the threads to finish
+
 }
 
 func getJSONList(configPath string) {

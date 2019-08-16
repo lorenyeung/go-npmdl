@@ -6,31 +6,15 @@ import (
 	"go-npmdl/auth"
 	"go-npmdl/helpers"
 	"log"
+	"os"
 )
 
 //Metadata blah
 type Metadata struct {
-	ID             string   `json:"_id"`
-	Rev            string   `json:"_rev"`
-	Name           string   `json:"_name"`
-	DistTags       struct{} `json:"dist_tags"`
-	Versions       map[string]DistMetadata
-	Attachments    struct{} `json:"_attachments"`
-	Readme         string
-	Maintainers    []map[string]string
-	Time           struct{} `json:"time"`
-	Users          struct{} `json:"users"`
-	ReadmeFilename string   `json:"readmeFilename"`
-	License        string   `json:"license"`
+	Versions map[string]DistMetadata
 }
 
-//Maintainers blah
-type Maintainers struct {
-	Name  string `json:"name"`
-	Email string `json:"email"`
-}
-
-//
+//DistMetadata blah
 type DistMetadata struct {
 	Dist struct {
 		Tarball string `json:"tarball"`
@@ -38,8 +22,8 @@ type DistMetadata struct {
 }
 
 //GetNPMMetadata blah
-func GetNPMMetadata(creds auth.Creds, URL, packageName string) {
-	log.Printf("Getting metadata for %s%s", URL, packageName)
+func GetNPMMetadata(creds auth.Creds, URL, packageIndex, packageName, configPath string) {
+	//log.Printf("Getting metadata for %s%s", URL, packageName)
 	data := auth.GetRestAPI(true, URL+packageName, creds.Username, creds.Apikey, "")
 
 	var metadata = Metadata{}
@@ -48,7 +32,11 @@ func GetNPMMetadata(creds auth.Creds, URL, packageName string) {
 		fmt.Println("error:" + err.Error())
 	}
 	for i, j := range metadata.Versions {
-		fmt.Println(i, j.Dist.Tarball)
+		packageDl := packageIndex + "-" + i + ".tgz"
+		log.Println(i, j.Dist.Tarball, configPath+"downloads/"+packageDl)
+		auth.GetRestAPI(true, j.Dist.Tarball, creds.Username, creds.Apikey, configPath+"downloads/"+packageDl)
+		err := os.Remove(configPath + "downloads/" + packageDl)
+		helpers.Check(err, false, "Deleting file")
 	}
 	helpers.Check(err, true, "Reading")
 }
