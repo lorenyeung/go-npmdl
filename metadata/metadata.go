@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 )
 
 //Metadata blah
@@ -37,12 +38,13 @@ func GetNPMMetadata(creds auth.Creds, URL, packageIndex, packageName, configPath
 	for i, j := range metadata.Versions {
 		packageDl := packageIndex + "-" + i + ".tgz"
 
-		res, err := http.Head(j.Dist.Tarball)
+		s := strings.Split(j.Dist.Tarball, URL)
+		res, err := http.Head(creds.URL + "/" + creds.Repository + "-cache/" + s[1])
 		if err != nil {
 			panic(err)
 		}
 		if res.StatusCode == 200 {
-			log.Printf("skipping %s, got 200 on HEAD request\n", j.Dist.Tarball)
+			log.Printf("skipping, got 200 on HEAD request for %s\n", creds.URL+"/"+creds.Repository+"-cache/"+s[1])
 			continue
 		}
 		log.Println(packageIndex, i, j.Dist.Tarball, configPath+"downloads/"+packageDl)
