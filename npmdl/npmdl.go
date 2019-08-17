@@ -41,6 +41,7 @@ func main() {
 		err = os.MkdirAll(configPath+"downloads/", 0700)
 		helpers.Check(err, true, "Generating "+configPath+" directory")
 	}
+	//TODO clean up downloads dir beforehand
 
 	masterKey := auth.VerifyMasterKey(configPath + "master.key")
 	creds := auth.GetDownloadJSON(configPath+"download.json", masterKey)
@@ -73,7 +74,6 @@ func main() {
 					wg.Done()
 					return
 				}
-				log.Printf("Worker %d", i)
 				metadata.GetNPMMetadata(creds, creds.URL+"/api/npm/"+creds.Repository+"/", s[0], s[1], configPath)
 			}
 		}(i)
