@@ -143,7 +143,9 @@ func GetRestAPI(auth bool, urlInput, userName, apiKey, filepath string) []byte {
 
 		resp, err := client.Do(req)
 		helpers.Check(err, false, "The HTTP response")
-		//defer resp.Body.Close()
+		if err != nil {
+			return nil
+		}
 
 		if filepath != "" {
 			//download percent logger
@@ -157,7 +159,7 @@ func GetRestAPI(auth bool, urlInput, userName, apiKey, filepath string) []byte {
 			// done := make(chan int64)
 			// go helpers.PrintDownloadPercent(done, filepath, int64(resp.ContentLength))
 			_, err = io.Copy(out, resp.Body)
-			helpers.Check(err, true, "The file copy")
+			helpers.Check(err, false, "The file copy")
 			// log.Println("Checking downloaded Shasum's match")
 			// fileSha256 := helpers.ComputeSha256(filepath)
 			// if sourceSha256 != fileSha256 {
@@ -166,7 +168,8 @@ func GetRestAPI(auth bool, urlInput, userName, apiKey, filepath string) []byte {
 			// log.Println("Shasums match.")
 
 		} else {
-			data, _ := ioutil.ReadAll(resp.Body)
+			data, err := ioutil.ReadAll(resp.Body)
+			helpers.Check(err, false, "Data read")
 			return data
 		}
 	}

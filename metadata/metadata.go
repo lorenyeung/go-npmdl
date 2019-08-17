@@ -38,6 +38,7 @@ func GetNPMMetadata(creds auth.Creds, URL, packageIndex, packageName, configPath
 	for i, j := range metadata.Versions {
 		packageDl := packageIndex + "-" + i + ".tgz"
 
+		//TODO can be a problem if you set override base url and the URL no longer matches correctly
 		s := strings.Split(j.Dist.Tarball, URL)
 		res, err := http.Head(creds.URL + "/" + creds.Repository + "-cache/" + s[1])
 		if err != nil {
