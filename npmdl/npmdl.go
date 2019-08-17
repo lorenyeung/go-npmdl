@@ -51,7 +51,9 @@ func main() {
 		creds = auth.GetDownloadJSON(configPath+"download.json", masterKey)
 	}
 	var workers = argsWithoutProg[0]
-	log.Printf("%s %s", configPath, workers)
+	if workers == "reload" {
+		creds = auth.GetDownloadJSON(configPath+"download.json", masterKey)
+	}
 	getJSONList(configPath)
 	getList(configPath)
 
