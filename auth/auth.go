@@ -143,8 +143,12 @@ func GetRestAPI(auth bool, urlInput, userName, apiKey, filepath string) []byte {
 
 		resp, err := client.Do(req)
 		helpers.Check(err, false, "The HTTP response")
+
 		if err != nil {
 			return nil
+		}
+		if resp.StatusCode != 200 {
+			log.Printf("Got status code %d for %s, continuing\n", resp.StatusCode, urlInput)
 		}
 
 		if filepath != "" {

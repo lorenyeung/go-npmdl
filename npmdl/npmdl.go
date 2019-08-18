@@ -3,7 +3,7 @@ package main
 import (
 	"bufio"
 	"encoding/json"
-	"fmt"
+	"flag"
 	"go-npmdl/auth"
 	"go-npmdl/helpers"
 	"go-npmdl/metadata"
@@ -24,16 +24,11 @@ type NpmIds struct {
 }
 
 func main() {
-	if len(os.Args) == 1 {
-		log.Println("Please enter number of workers")
-		os.Exit(0)
-	}
+
 	usr, err := user.Current()
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	argsWithoutProg := os.Args[1:]
 	configFolder := "/.lorenygo/npmdownloader/"
 	configPath := usr.HomeDir + configFolder
 	if _, err := os.Stat(configPath + "downloads/"); os.IsNotExist(err) {
@@ -45,15 +40,41 @@ func main() {
 
 	masterKey := auth.VerifyMasterKey(configPath + "master.key")
 	creds := auth.GetDownloadJSON(configPath+"download.json", masterKey)
-	if !auth.VerifyAPIKey(creds.URL, creds.Username, creds.Apikey) {
-		fmt.Println("Looks like there's an issue with your credentials.")
-		auth.GenerateDownloadJSON(configPath+"download.json", true, masterKey)
-		creds = auth.GetDownloadJSON(configPath+"download.json", masterKey)
+
+	var workersVar int
+	var usernameVar, apikeyVar, urlVar, repoVar string
+	var resetVar bool
+	flag.IntVar(&workersVar, "workers", 50, "Number of workers")
+	flag.StringVar(&usernameVar, "username", creds.Username, "Username")
+	flag.StringVar(&apikeyVar, "apikey", creds.Apikey, "API key")
+	flag.StringVar(&urlVar, "url", creds.URL, "URL")
+	flag.StringVar(&repoVar, "repo", creds.Repository, "Download Repository")
+	flag.BoolVar(&resetVar, "reset", false, "Reset creds file")
+	flag.Parse()
+
+	if resetVar == true {
+		creds = auth.GenerateDownloadJSON(configPath+"download.json", true, masterKey)
+		usernameVar = creds.Username
+		apikeyVar = creds.Apikey
+		urlVar = creds.URL
+		repoVar = creds.Repository
 	}
-	var workers = argsWithoutProg[0]
-	if workers == "reload" {
-		creds = auth.GetDownloadJSON(configPath+"download.json", masterKey)
+	if !auth.VerifyAPIKey(urlVar, usernameVar, apikeyVar) {
+		log.Println("Looks like there's an issue with your credentials file. Reseting")
+		if creds.Username == usernameVar && creds.Apikey == apikeyVar && creds.URL == urlVar {
+			auth.GenerateDownloadJSON(configPath+"download.json", true, masterKey)
+			creds = auth.GetDownloadJSON(configPath+"download.json", masterKey)
+		} else {
+			log.Print("Issue with custom credentials")
+			os.Exit(1)
+		}
 	}
+	//update custom
+	creds.Username = usernameVar
+	creds.Apikey = apikeyVar
+	creds.URL = urlVar
+	creds.Repository = repoVar
+
 	getJSONList(configPath)
 	getList(configPath)
 
@@ -63,12 +84,11 @@ func main() {
 
 	scanner := bufio.NewScanner(file)
 
-	intWorkers, _ := strconv.Atoi(workers)
 	//var mutex = &sync.Mutex{} //should help with the concurrent map writes issue
-	var ch = make(chan []string, intWorkers+1)
+	var ch = make(chan []string, workersVar+1)
 	var wg sync.WaitGroup //multi threading the GET details request
-	wg.Add(intWorkers)
-	for i := 0; i < intWorkers; i++ {
+	wg.Add(workersVar)
+	for i := 0; i < workersVar; i++ {
 		go func(i int) {
 			for {
 				s, ok := <-ch
@@ -94,14 +114,14 @@ func main() {
 
 func getJSONList(configPath string) {
 	if _, err := os.Stat(configPath + "all-npm.json"); os.IsNotExist(err) {
-		log.Println("No all-npm.json found")
+		log.Println("No all-npm.json found, creating...")
 		auth.GetRestAPI(false, "https://replicate.npmjs.com/_all_docs", "", "", configPath+"all-npm.json")
 	}
 }
 
 func getList(configPath string) {
 	if _, err := os.Stat(configPath + "all-npm-id.txt"); os.IsNotExist(err) {
-		log.Println("No all-npm-id.txt found")
+		log.Println("No all-npm-id.txt found, creating...")
 		var result NpmIds
 
 		file, err := os.Open(configPath + "all-npm.json")
