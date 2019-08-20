@@ -45,12 +45,19 @@ func main() {
 	var usernameVar, apikeyVar, urlVar, repoVar string
 	var resetVar bool
 	flag.IntVar(&workersVar, "workers", 50, "Number of workers")
-	flag.StringVar(&usernameVar, "username", creds.Username, "Username")
-	flag.StringVar(&apikeyVar, "apikey", creds.Apikey, "API key")
+	flag.StringVar(&usernameVar, "username", "", "Username")
+	flag.StringVar(&apikeyVar, "apikey", "", "API key")
 	flag.StringVar(&urlVar, "url", creds.URL, "URL")
 	flag.StringVar(&repoVar, "repo", creds.Repository, "Download Repository")
 	flag.BoolVar(&resetVar, "reset", false, "Reset creds file")
 	flag.Parse()
+
+	if usernameVar == "" {
+		usernameVar = creds.Username
+	}
+	if apikeyVar == "" {
+		apikeyVar = creds.Apikey
+	}
 
 	if resetVar == true {
 		creds = auth.GenerateDownloadJSON(configPath+"download.json", true, masterKey)
@@ -60,12 +67,12 @@ func main() {
 		repoVar = creds.Repository
 	}
 	if !auth.VerifyAPIKey(urlVar, usernameVar, apikeyVar) {
-		log.Println("Looks like there's an issue with your credentials file. Reseting")
 		if creds.Username == usernameVar && creds.Apikey == apikeyVar && creds.URL == urlVar {
+			log.Println("Looks like there's an issue with your credentials file. Reseting")
 			auth.GenerateDownloadJSON(configPath+"download.json", true, masterKey)
 			creds = auth.GetDownloadJSON(configPath+"download.json", masterKey)
 		} else {
-			log.Print("Issue with custom credentials")
+			log.Println("Looks like there's an issue with your custom credentials. Exiting")
 			os.Exit(1)
 		}
 	}
@@ -115,7 +122,7 @@ func main() {
 func getJSONList(configPath string) {
 	if _, err := os.Stat(configPath + "all-npm.json"); os.IsNotExist(err) {
 		log.Println("No all-npm.json found, creating...")
-		auth.GetRestAPI(false, "https://replicate.npmjs.com/_all_docs", "", "", configPath+"all-npm.json")
+		auth.GetRestAPI("GET", false, "https://replicate.npmjs.com/_all_docs", "", "", configPath+"all-npm.json")
 	}
 }
 

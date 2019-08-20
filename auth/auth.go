@@ -31,7 +31,7 @@ type Creds struct {
 // VerifyAPIKey for errors
 func VerifyAPIKey(urlInput, userName, apiKey string) bool {
 	log.Printf("starting VerifyAPIkey request. Testing: %s\n", userName)
-	data := GetRestAPI(true, urlInput+"/api/system/ping", userName, apiKey, "")
+	data, _ := GetRestAPI("GET", true, urlInput+"/api/system/ping", userName, apiKey, "")
 	if string(data) == "OK" {
 		log.Printf("finished VerifyAPIkey request. Credentials are good to go.")
 		return true
@@ -131,9 +131,9 @@ func GetDownloadJSON(fileLocation string, masterKey string) Creds {
 }
 
 //GetRestAPI GET rest APIs response with error handling
-func GetRestAPI(auth bool, urlInput, userName, apiKey, filepath string) []byte {
+func GetRestAPI(method string, auth bool, urlInput, userName, apiKey, filepath string) ([]byte, int) {
 	client := http.Client{}
-	req, err := http.NewRequest("GET", urlInput, nil)
+	req, err := http.NewRequest(method, urlInput, nil)
 	if auth {
 		req.SetBasicAuth(userName, apiKey)
 	}
@@ -145,13 +145,15 @@ func GetRestAPI(auth bool, urlInput, userName, apiKey, filepath string) []byte {
 		helpers.Check(err, false, "The HTTP response")
 
 		if err != nil {
-			return nil
+			return nil, 0
 		}
 		if resp.StatusCode != 200 {
 			log.Printf("Got status code %d for %s, continuing\n", resp.StatusCode, urlInput)
 		}
+		//Mostly for HEAD requests
+		statusCode := resp.StatusCode
 
-		if filepath != "" {
+		if filepath != "" && method == "GET" {
 			//download percent logger
 			//sourceSha256 := string(resp.Header["X-Checksum-Sha256"][0])
 			//fmt.Println(resp.Header["Content-Disposition"][0])
@@ -174,10 +176,10 @@ func GetRestAPI(auth bool, urlInput, userName, apiKey, filepath string) []byte {
 		} else {
 			data, err := ioutil.ReadAll(resp.Body)
 			helpers.Check(err, false, "Data read")
-			return data
+			return data, statusCode
 		}
 	}
-	return nil
+	return nil, 0
 }
 
 //CreateHash self explanatory
