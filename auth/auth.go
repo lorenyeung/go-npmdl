@@ -17,6 +17,8 @@ import (
 	"net/http"
 	"os"
 	"strings"
+
+	"golang.org/x/crypto/ssh/terminal"
 )
 
 //Creds struct for creating download.json
@@ -46,14 +48,22 @@ func GenerateDownloadJSON(configPath string, regen bool, masterKey string) Creds
 	if regen {
 		creds = GetDownloadJSON(configPath, masterKey)
 	}
-	var urlInput, userName, apiKey string
+	var urlInput, userName, apiKey, repoInput string
 	reader := bufio.NewReader(os.Stdin)
-	fmt.Printf("Enter your url [%s]: ", creds.URL)
 	for {
+		fmt.Printf("Enter your url [%s]: ", creds.URL)
 		urlInput, _ = reader.ReadString('\n')
 		urlInput = strings.TrimSuffix(urlInput, "\n")
 		if urlInput == "" {
 			urlInput = creds.URL
+		}
+		if !strings.HasPrefix(urlInput, "http") {
+			fmt.Println("Please enter a HTTP(s) protocol")
+			continue
+		}
+		if strings.HasSuffix(urlInput, "/") {
+			fmt.Println("stripping trailing /")
+			urlInput = strings.TrimSuffix(urlInput, "/")
 		}
 		fmt.Printf("Enter your username [%s]: ", creds.Username)
 		userName, _ = reader.ReadString('\n')
@@ -61,23 +71,32 @@ func GenerateDownloadJSON(configPath string, regen bool, masterKey string) Creds
 		if userName == "" {
 			userName = creds.Username
 		}
-		fmt.Print("Enter your API key: ")
-		apiKey, _ = reader.ReadString('\n')
-		apiKey = strings.TrimSuffix(apiKey, "\n")
+		fmt.Print("Enter your API key/Password: ")
+		apiKeyByte, _ := terminal.ReadPassword(0)
+		apiKey = string(apiKeyByte)
+		println()
 		if VerifyAPIKey(urlInput, userName, apiKey) {
 			break
 		} else {
-			fmt.Print("Something seems wrong, please try again. Enter your url: ")
+			fmt.Println("Something seems wrong, please try again.")
 		}
 	}
 	dlLocationInput := configPath
 
-	//TODO need to check if repo exists. trim trailing /
-	fmt.Printf("Enter your repository [%s]: ", creds.Repository)
-	repoInput, _ := reader.ReadString('\n')
-	repoInput = strings.TrimSuffix(repoInput, "\n")
-	if repoInput == "" {
-		repoInput = creds.Repository
+	for {
+		//TODO need to check if repo exists. trim trailing /
+		fmt.Printf("Enter your repository [%s]: ", creds.Repository)
+		repoInput, _ = reader.ReadString('\n')
+		repoInput = strings.TrimSuffix(repoInput, "\n")
+		if repoInput == "" {
+			repoInput = creds.Repository
+		}
+		_, headStatusCode := GetRestAPI("HEAD", true, urlInput+"/"+repoInput+"/", userName, apiKey, "")
+		if headStatusCode != 200 {
+			fmt.Println("Repo does not exist or your user does not have permissions. Try again.")
+			continue
+		}
+		break
 	}
 	return writeFileDownloadJSON(configPath, urlInput, userName, apiKey, dlLocationInput, repoInput, masterKey)
 }
@@ -120,7 +139,6 @@ func GetDownloadJSON(fileLocation string, masterKey string) Creds {
 		defer file.Close()
 		byteValue, _ := ioutil.ReadAll(file)
 		json.Unmarshal([]byte(byteValue), &result)
-		//TODO need to validate some of these fields
 		resultData.URL = Decrypt(result["URL"].(string), masterKey)
 		resultData.Username = Decrypt(result["Username"].(string), masterKey)
 		resultData.Apikey = Decrypt(result["Apikey"].(string), masterKey)
@@ -154,25 +172,15 @@ func GetRestAPI(method string, auth bool, urlInput, userName, apiKey, filepath s
 		statusCode := resp.StatusCode
 
 		if filepath != "" && method == "GET" {
-			//download percent logger
-			//sourceSha256 := string(resp.Header["X-Checksum-Sha256"][0])
-			//fmt.Println(resp.Header["Content-Disposition"][0])
 			// Create the file
 			out, err := os.Create(filepath)
 			helpers.Check(err, false, "File create")
 			defer out.Close()
 
-			// done := make(chan int64)
-			// go helpers.PrintDownloadPercent(done, filepath, int64(resp.ContentLength))
+			//done := make(chan int64)
+			//go helpers.PrintDownloadPercent(done, filepath, int64(resp.ContentLength))
 			_, err = io.Copy(out, resp.Body)
 			helpers.Check(err, false, "The file copy")
-			// log.Println("Checking downloaded Shasum's match")
-			// fileSha256 := helpers.ComputeSha256(filepath)
-			// if sourceSha256 != fileSha256 {
-			// 	fmt.Printf("Shasums do not match. Source: %s filesystem %s\n", sourceSha256, fileSha256)
-			// }
-			// log.Println("Shasums match.")
-
 		} else {
 			data, err := ioutil.ReadAll(resp.Body)
 			helpers.Check(err, false, "Data read")
@@ -212,6 +220,10 @@ func Decrypt(dataString string, passphrase string) string {
 	helpers.Check(err, true, "Cipher")
 	gcm, err := cipher.NewGCM(block)
 	helpers.Check(err, true, "Cipher GCM")
+	// TODO if decrypt failure
+	//	if err != nil {
+	// 	GenerateDownloadJSON(fileLocation, false, passphrase)
+	// }
 	nonceSize := gcm.NonceSize()
 	nonce, ciphertext := data[:nonceSize], data[nonceSize:]
 	plaintext, err := gcm.Open(nil, nonce, ciphertext, nil)

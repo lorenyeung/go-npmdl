@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"go-npmdl/auth"
+	"go-npmdl/metadata"
 	"log"
 	"os/user"
 	"testing"
@@ -31,22 +33,35 @@ func TestVerifyApiKey(t *testing.T) {
 
 }
 
-func TestGenerateDownloadJSON(t *testing.T) {
-
+func TestGetNPMMetadata(t *testing.T) {
+	t.Log("Testing NPM Metadata")
+	creds := userForTesting()
+	metadata.GetNPMMetadata(creds, creds.URL+"/api/npm/"+creds.Repository+"/", "49", "005-http-antao", creds.DlLocation)
 }
 
-func userForTesting() Creds {
+func TestGenerateDownloadJSON(t *testing.T) {
+	t.Log("Testing GenerateDownloadJSON")
+	var stdin bytes.Buffer
+	//creds := userForTesting()
+	stdin.Write([]byte("hunter2\n"))
+
+	// result, err := auth.GenerateDownloadJSON(creds.DlLocation, &stdin)
+	// assert.NoError(t, err)
+	// assert.Equal(t, "hunter2", result)
+}
+
+func userForTesting() auth.Creds {
 	usr, err := user.Current()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	data := Creds{
+	data := auth.Creds{
 		URL:        "http://localhost:8081/artifactory",
-		Username:   "tester",
+		Username:   "admin",
 		Apikey:     "password",
 		DlLocation: string(usr.HomeDir + "/testing"),
-		Repository: "testing",
+		Repository: "npm-remote",
 	}
 	return data
 }

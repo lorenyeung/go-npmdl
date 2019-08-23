@@ -113,10 +113,8 @@ func main() {
 		s := strings.Fields(scanner.Text())
 		ch <- s
 	}
-
 	close(ch) // This tells the goroutines there's nothing else to do
 	wg.Wait() // Wait for the threads to finish
-
 }
 
 func getJSONList(configPath string) {
