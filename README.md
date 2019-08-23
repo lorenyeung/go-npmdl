@@ -1,15 +1,18 @@
 # npmdl go script
 
-## Purpose:
+## Purpose
 Download a bunch of npm packages and cache them in an Artifactory remote repository
 
 ## Installation
-Find your go home (`go env`), then install under
-`$GO_HOME/src` (do not create another folder)
+Find your go home (`go env`) 
 
-`git clone https://github.com/lorenyeung/go-npmdl.git`
+then install under `$GO_HOME/src` (do not create another folder)
+
+`$ git clone https://github.com/lorenyeung/go-npmdl.git`
+
 then run
-`go run $GO_HOME/src/go-npmdl/npmdl/npmdl.go`
+
+`$ go run $GO_HOME/src/go-npmdl/npmdl/npmdl.go`
 
 ## Dependencies
 ```
