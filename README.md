@@ -14,6 +14,8 @@ then run
 
 `$ go run $GO_HOME/src/go-npmdl/npmdl/npmdl.go`
 
+Happy downloading
+
 ## Dependencies
 ```
 golang.org/x/crypto/ssh/terminal
