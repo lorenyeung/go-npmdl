@@ -14,7 +14,7 @@ then run
 
 `$ go run $GO_HOME/src/go-npmdl/npmdl/npmdl.go`
 
-Happy downloading!
+!Happy downloading!
 
 ## Dependencies
 ```
