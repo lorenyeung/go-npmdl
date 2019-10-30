@@ -1,4 +1,4 @@
-package main
+package debiandl
 
 import (
 	"fmt"
@@ -15,7 +15,7 @@ import (
 func main() {
 
 	url := "http://archive.ubuntu.com/ubuntu"
-    getHrefs(url+"/pool/", url, "")
+	getHrefs(url+"/pool/", url, "")
 
 }
 

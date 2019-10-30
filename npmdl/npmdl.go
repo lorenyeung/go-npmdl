@@ -25,16 +25,24 @@ type NpmIds struct {
 
 func main() {
 
+	supportedTypes := [2]string{"debian", "npm"}
+
 	usr, err := user.Current()
 	if err != nil {
 		log.Fatal(err)
 	}
-	configFolder := "/.lorenygo/npmdownloader/"
+	configFolder := "/.lorenygo/pkgDownloader/"
 	configPath := usr.HomeDir + configFolder
-	if _, err := os.Stat(configPath + "downloads/"); os.IsNotExist(err) {
-		log.Println("No config folder found")
-		err = os.MkdirAll(configPath+"downloads/", 0700)
-		helpers.Check(err, true, "Generating "+configPath+" directory")
+
+	for i := 0; i < len(supportedTypes); i++ {
+		log.Println("Checking that", supportedTypes[i], "downloads folder exists")
+		if _, err := os.Stat(configPath + supportedTypes[i] + "Downloads/"); os.IsNotExist(err) {
+			log.Println("No config folder found")
+			err = os.MkdirAll(configPath+supportedTypes[i]+"Downloads/", 0700)
+			helpers.Check(err, true, "Generating "+configPath+" directory")
+		} else {
+			log.Println(supportedTypes[i], "downloads folder exists, continuing..")
+		}
 	}
 	//TODO clean up downloads dir beforehand
 
@@ -82,6 +90,7 @@ func main() {
 	creds.URL = urlVar
 	creds.Repository = repoVar
 
+	//from here its NPM - need to flag it
 	getJSONList(configPath)
 	getList(configPath)
 
@@ -117,6 +126,7 @@ func main() {
 	wg.Wait() // Wait for the threads to finish
 }
 
+//npm
 func getJSONList(configPath string) {
 	if _, err := os.Stat(configPath + "all-npm.json"); os.IsNotExist(err) {
 		log.Println("No all-npm.json found, creating...")
@@ -124,6 +134,7 @@ func getJSONList(configPath string) {
 	}
 }
 
+//npm
 func getList(configPath string) {
 	if _, err := os.Stat(configPath + "all-npm-id.txt"); os.IsNotExist(err) {
 		log.Println("No all-npm-id.txt found, creating...")
