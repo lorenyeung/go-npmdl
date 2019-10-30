@@ -4,7 +4,9 @@ import (
 	"bufio"
 	"encoding/json"
 	"flag"
+	"fmt"
 	"go-npmdl/auth"
+	"go-npmdl/debiandl"
 	"go-npmdl/helpers"
 	"go-npmdl/metadata"
 	"io/ioutil"
@@ -50,14 +52,15 @@ func main() {
 	creds := auth.GetDownloadJSON(configPath+"download.json", masterKey)
 
 	var workersVar int
-	var usernameVar, apikeyVar, urlVar, repoVar string
+	var usernameVar, apikeyVar, urlVar, repoVar, repoTypeVar string
 	var resetVar bool
 	flag.IntVar(&workersVar, "workers", 50, "Number of workers")
-	flag.StringVar(&usernameVar, "username", "", "Username")
+	flag.StringVar(&usernameVar, "user", "", "Username")
 	flag.StringVar(&apikeyVar, "apikey", "", "API key")
 	flag.StringVar(&urlVar, "url", creds.URL, "URL")
-	flag.StringVar(&repoVar, "repo", creds.Repository, "Download Repository")
+	flag.StringVar(&repoVar, "repo", "", "Download Repository")
 	flag.BoolVar(&resetVar, "reset", false, "Reset creds file")
+	flag.StringVar(&repoTypeVar, "pkg", "", "Package type")
 	flag.Parse()
 
 	if usernameVar == "" {
@@ -65,6 +68,11 @@ func main() {
 	}
 	if apikeyVar == "" {
 		apikeyVar = creds.Apikey
+	}
+
+	if (repoTypeVar == "" || repoVar == "") && resetVar != true {
+		log.Println("Must specify -pkg and -repo")
+		os.Exit(0)
 	}
 
 	if resetVar == true {
@@ -84,46 +92,53 @@ func main() {
 			os.Exit(1)
 		}
 	}
+
 	//update custom
 	creds.Username = usernameVar
 	creds.Apikey = apikeyVar
 	creds.URL = urlVar
 	creds.Repository = repoVar
 
-	//from here its NPM - need to flag it
-	getJSONList(configPath)
-	getList(configPath)
+	switch repoTypeVar {
+	case "debian":
+		fmt.Println("debian")
+		url := "http://archive.ubuntu.com/ubuntu"
+		debiandl.GetDebianHrefs(url+"/pool/", url, creds.URL, configPath)
+	case "npm":
+		//from here its NPM - need to flag it
+		getJSONList(configPath)
+		getList(configPath)
 
-	file, err := os.Open(configPath + "all-npm-id.txt")
-	helpers.Check(err, true, "npm id read")
-	defer file.Close()
+		file, err := os.Open(configPath + "all-npm-id.txt")
+		helpers.Check(err, true, "npm id read")
+		defer file.Close()
+		scanner := bufio.NewScanner(file)
 
-	scanner := bufio.NewScanner(file)
-
-	//var mutex = &sync.Mutex{} //should help with the concurrent map writes issue
-	var ch = make(chan []string, workersVar+1)
-	var wg sync.WaitGroup //multi threading the GET details request
-	wg.Add(workersVar)
-	for i := 0; i < workersVar; i++ {
-		go func(i int) {
-			for {
-				s, ok := <-ch
-				if !ok { // if there is nothing to do and the channel has been closed then end the goroutine
-					wg.Done()
-					return
+		//var mutex = &sync.Mutex{} //should help with the concurrent map writes issue
+		var ch = make(chan []string, workersVar+1)
+		var wg sync.WaitGroup //multi threading the GET details request
+		wg.Add(workersVar)
+		for i := 0; i < workersVar; i++ {
+			go func(i int) {
+				for {
+					s, ok := <-ch
+					if !ok { // if there is nothing to do and the channel has been closed then end the goroutine
+						wg.Done()
+						return
+					}
+					metadata.GetNPMMetadata(creds, creds.URL+"/api/npm/"+creds.Repository+"/", s[0], s[1], configPath)
 				}
-				metadata.GetNPMMetadata(creds, creds.URL+"/api/npm/"+creds.Repository+"/", s[0], s[1], configPath)
-			}
-		}(i)
-	}
+			}(i)
+		}
 
-	// Now the jobs can be added to the channel, which is used as a queue
-	for scanner.Scan() {
-		s := strings.Fields(scanner.Text())
-		ch <- s
+		// Now the jobs can be added to the channel, which is used as a queue
+		for scanner.Scan() {
+			s := strings.Fields(scanner.Text())
+			ch <- s
+		}
+		close(ch) // This tells the goroutines there's nothing else to do
+		wg.Wait() // Wait for the threads to finish
 	}
-	close(ch) // This tells the goroutines there's nothing else to do
-	wg.Wait() // Wait for the threads to finish
 }
 
 //npm

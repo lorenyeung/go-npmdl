@@ -2,9 +2,9 @@ package debiandl
 
 import (
 	"fmt"
+	"go-npmdl/helpers"
 	"io"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -12,30 +12,10 @@ import (
 	"golang.org/x/net/html"
 )
 
-func main() {
-
-	url := "http://archive.ubuntu.com/ubuntu"
-	getHrefs(url+"/pool/", url, "")
-
-}
-
-func check(e error, panic bool, logs string) {
-	if e != nil && panic {
-		log.Panicf("%s failed with error:%s\n", logs, e)
-	}
-	if e != nil && !panic {
-		log.Printf("%s failed with error:%s\n", logs, e)
-	}
-}
-
-func getHrefs(url string, base string, arti string) string {
+//GetDebianHrefs parse hrefs for debian files
+func GetDebianHrefs(url string, base string, arti string, configPath string) string {
 	resp, err := http.Get(url)
-	//bytes, _ := ioutil.ReadAll(resp.Body)
-
-	//fmt.Println("HTML:\n\n", string(bytes))
-	if err != nil {
-		fmt.Println(err)
-	}
+	helpers.Check(err, true, "HTTP GET error")
 	defer resp.Body.Close()
 
 	z := html.NewTokenizer(resp.Body)
@@ -52,56 +32,53 @@ func getHrefs(url string, base string, arti string) string {
 
 			isAnchor := t.Data == "a"
 			if isAnchor {
-
 				// recursive look
-
 				for _, a := range t.Attr {
 					if a.Key == "href" && (strings.HasSuffix(a.Val, "/")) {
-						//fmt.Println("Found href:", a.Val)
-						getHrefs(url+a.Val, base, arti)
+						GetDebianHrefs(url+a.Val, base, arti, configPath)
 						break
 					}
 				}
+				checkDebian(t, url, base, arti, configPath)
+			}
+		}
+	}
+}
 
-				if strings.Contains(t.String(), ".deb") {
-					for _, a := range t.Attr {
+func checkDebian(t html.Token, url string, base string, arti string, configPath string) {
+	if strings.Contains(t.String(), ".deb") {
+		for _, a := range t.Attr {
+			if a.Key == "href" && (strings.HasSuffix(a.Val, ".deb")) {
+				hrefraw := url + a.Val
+				href := strings.TrimPrefix(hrefraw, base)
+				go func() {
+					fmt.Println("Downloading ", arti+href)
 
-						// this here can be multi threaded maybe
-						if a.Key == "href" && (strings.HasSuffix(a.Val, ".deb")) {
-							hrefraw := url + a.Val
-							href := strings.TrimPrefix(hrefraw, base)
-							go func() {
-								fmt.Println("Found href:", arti+href)
+					client := http.Client{}
+					req, err := http.NewRequest("GET", arti+href, nil)
+					//req.SetBasicAuth(userName, apiKey)
+					if err != nil {
+						fmt.Printf("The HTTP request failed with error %s\n", err)
+					} else {
+						filepath := configPath + "debianDownloads/" + a.Val
 
-								client := http.Client{}
-								req, err := http.NewRequest("GET", arti+href, nil)
-								//req.SetBasicAuth(userName, apiKey)
-								if err != nil {
-									fmt.Printf("The HTTP request failed with error %s\n", err)
-								} else {
-									filepath := "/Users/loreny/go/src/go-debiandl/" + a.Val
+						resp, err := client.Do(req)
+						helpers.Check(err, false, "Client check")
+						if filepath != "" {
+							// Create the file
+							out, err := os.Create(filepath)
+							helpers.Check(err, false, "File create")
+							defer out.Close()
+							_, err = io.Copy(out, resp.Body)
+							helpers.Check(err, true, "File copy")
 
-									resp, err := client.Do(req)
-									check(err, false, "Client check")
-									if filepath != "" {
-										// Create the file
-										out, err := os.Create(filepath)
-										check(err, false, "File create")
-										defer out.Close()
-										_, err = io.Copy(out, resp.Body)
-										check(err, true, "File copy")
-
-									} else {
-										ioutil.ReadAll(resp.Body)
-									}
-									os.Remove(filepath)
-								}
-							}()
-
-							break
+						} else {
+							ioutil.ReadAll(resp.Body)
 						}
+						os.Remove(filepath)
 					}
-				}
+				}()
+				break
 			}
 		}
 	}

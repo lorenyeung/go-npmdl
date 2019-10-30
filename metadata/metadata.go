@@ -42,9 +42,9 @@ func GetNPMMetadata(creds auth.Creds, URL, packageIndex, packageName, configPath
 				continue
 			}
 		}
-		log.Println(packageIndex, i, j.Dist.Tarball, configPath+"downloads/"+packageDl)
-		auth.GetRestAPI("GET", true, j.Dist.Tarball, creds.Username, creds.Apikey, configPath+"downloads/"+packageDl)
-		err2 := os.Remove(configPath + "downloads/" + packageDl)
+		log.Println(packageIndex, i, j.Dist.Tarball, configPath+"npmDownloads/"+packageDl)
+		auth.GetRestAPI("GET", true, j.Dist.Tarball, creds.Username, creds.Apikey, configPath+"npmDownloads/"+packageDl)
+		err2 := os.Remove(configPath + "npmDownloads/" + packageDl)
 		helpers.Check(err2, false, "Deleting file")
 	}
 	helpers.Check(err, false, "Reading")
