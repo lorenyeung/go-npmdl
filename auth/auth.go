@@ -10,7 +10,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"go-npmdl/helpers"
+	"go-pkgdl/helpers"
 	"io"
 	"io/ioutil"
 	"log"

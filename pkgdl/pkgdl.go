@@ -4,25 +4,16 @@ import (
 	"bufio"
 	"encoding/json"
 	"flag"
-	"go-npmdl/auth"
-	"go-npmdl/debian"
-	"go-npmdl/helpers"
-	"go-npmdl/npm"
-	"io/ioutil"
+	"go-pkgdl/auth"
+	"go-pkgdl/debian"
+	"go-pkgdl/helpers"
+	"go-pkgdl/npm"
 	"log"
 	"os"
 	"os/user"
-	"strconv"
 	"strings"
 	"sync"
 )
-
-//NpmIds lol
-type NpmIds struct {
-	Rows []struct {
-		ID string `json:"id"`
-	} `json:"rows"`
-}
 
 func main() {
 
@@ -98,13 +89,16 @@ func main() {
 	creds.URL = urlVar
 	creds.Repository = repoVar
 
+	checkTypeAndRepoParams(creds)
+
+	//case switch for different package types
 	switch repoTypeVar {
 	case "debian":
 		url := "http://archive.ubuntu.com/ubuntu"
-		debian.GetDebianHrefs(url+"/pool/", url, creds.URL+"/"+creds.Repository, configPath)
+		debian.GetDebianHrefs(url+"/pool/", url, creds.URL+"/"+creds.Repository, configPath, creds)
 	case "npm":
-		getJSONList(configPath)
-		getList(configPath)
+		npm.GetNPMJSONList(configPath)
+		npm.GetNPMList(configPath)
 		file, err := os.Open(configPath + "all-npm-id.txt")
 		helpers.Check(err, true, "npm id read")
 		defer file.Close()
@@ -134,38 +128,22 @@ func main() {
 		}
 		close(ch) // This tells the goroutines there's nothing else to do
 		wg.Wait() // Wait for the threads to finish
+	default:
+		log.Println("Unsupported package type. We currently support the following:", supportedTypes)
 	}
 }
 
-//npm
-func getJSONList(configPath string) {
-	if _, err := os.Stat(configPath + "all-npm.json"); os.IsNotExist(err) {
-		log.Println("No all-npm.json found, creating...")
-		auth.GetRestAPI("GET", false, "https://replicate.npmjs.com/_all_docs", "", "", configPath+"all-npm.json")
+//Test if remote repository exists and is a remote
+func checkTypeAndRepoParams(creds auth.Creds) {
+	repoCheckData, repoStatusCode := auth.GetRestAPI("GET", true, creds.URL+"/api/repositories/"+creds.Repository, creds.Username, creds.Apikey, "")
+	if repoStatusCode != 200 {
+		log.Println("Repo", creds.Repository, "does not exist.")
+		os.Exit(0)
 	}
-}
-
-//npm
-func getList(configPath string) {
-	if _, err := os.Stat(configPath + "all-npm-id.txt"); os.IsNotExist(err) {
-		log.Println("No all-npm-id.txt found, creating...")
-		var result NpmIds
-
-		file, err := os.Open(configPath + "all-npm.json")
-
-		helpers.Check(err, true, "npm JSON read")
-		writeFile, err := os.OpenFile(configPath+"all-npm-id.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-		helpers.Check(err, true, "npm id write")
-		defer file.Close()
-		datawriter := bufio.NewWriter(writeFile)
-		byteValue, _ := ioutil.ReadAll(file)
-		json.Unmarshal([]byte(byteValue), &result)
-		for i, j := range result.Rows {
-			t := strconv.Itoa(i)
-			_, _ = datawriter.WriteString(string(t) + " " + j.ID + "\n")
-		}
-		datawriter.Flush()
-		writeFile.Close()
-
+	var result map[string]interface{}
+	json.Unmarshal([]byte(repoCheckData), &result)
+	if result["rclass"] != "remote" {
+		log.Println(creds.Repository, "is a", result["rclass"], "repository and not a remote repository.")
+		os.Exit(0)
 	}
 }
