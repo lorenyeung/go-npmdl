@@ -95,7 +95,7 @@ func main() {
 	switch repoTypeVar {
 	case "debian":
 		url := "http://archive.ubuntu.com/ubuntu"
-		debian.GetDebianHrefs(url+"/pool/", url, creds.URL+"/"+creds.Repository, configPath, creds)
+		debian.GetDebianHrefs(url+"/pool/", url, creds.URL, creds.Repository, configPath, creds, 1, "")
 	case "npm":
 		npm.GetNPMJSONList(configPath)
 		npm.GetNPMList(configPath)
