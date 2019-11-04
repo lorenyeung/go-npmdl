@@ -1,4 +1,4 @@
-package debian
+package maven
 
 import (
 	"fmt"
@@ -11,11 +11,10 @@ import (
 	"golang.org/x/net/html"
 )
 
-//GetDebianHrefs parse hrefs for debian files
-func GetDebianHrefs(url string, base string, arti string, repo string, configPath string, creds auth.Creds, index int, component string, dlFolder string, workers int) string {
+//GetMavenHrefs parse hrefs for debian files
+func GetMavenHrefs(url string, base string, arti string, repo string, configPath string, creds auth.Creds, index int, component string, dlFolder string) string {
 	resp, err := http.Get(url)
-	// this needs to be threaded better..
-	helpers.Check(err, false, "HTTP GET error")
+	helpers.Check(err, true, "HTTP GET error")
 	defer resp.Body.Close()
 
 	z := html.NewTokenizer(resp.Body)
@@ -38,28 +37,22 @@ func GetDebianHrefs(url string, base string, arti string, repo string, configPat
 						if index == 1 {
 							component = strings.TrimSuffix(a.Val, "/")
 						}
-						GetDebianHrefs(url+a.Val, base, arti, repo, configPath, creds, index+1, component, dlFolder, workers)
+						GetMavenHrefs(url+a.Val, base, arti, repo, configPath, creds, index+1, component, dlFolder)
 						break
 					}
 				}
-				checkDebian(t, url, base, arti, repo, configPath, creds, index, component, dlFolder, workers)
+				checkMaven(t, url, base, arti, repo, configPath, creds, index, component, dlFolder)
 			}
 		}
 	}
 }
 
-func checkDebian(t html.Token, url string, base string, arti string, repo string, configPath string, creds auth.Creds, index int, component string, dlFolder string, workersVar int) {
+func checkMaven(t html.Token, url string, base string, arti string, repo string, configPath string, creds auth.Creds, index int, component string, dlFolder string) {
 	if strings.Contains(t.String(), ".deb") {
 		for _, a := range t.Attr {
 			if a.Key == "href" && (strings.HasSuffix(a.Val, ".deb")) {
 				hrefraw := url + a.Val
 				href := strings.TrimPrefix(hrefraw, base)
-
-				//var mutex = &sync.Mutex{} //should help with the concurrent map writes issue
-				//var ch = make(chan []string, workersVar+1)
-				//var wg sync.WaitGroup //multi threading the GET details request
-				//wg.Add(workersVar)
-				//for i := 0; i < workersVar; i++ {
 				go func() {
 					parts := strings.Split(href, "_")
 					arch := strings.TrimSuffix(parts[len(parts)-1], ".deb")
@@ -69,16 +62,6 @@ func checkDebian(t html.Token, url string, base string, arti string, repo string
 					auth.GetRestAPI("PUT", true, arti+"/api/storage/"+repo+"-cache"+href+"?properties=deb.component="+component+";deb.architecture="+arch+";deb.distribution="+dist, creds.Username, creds.Apikey, "")
 					os.Remove(configPath + dlFolder + "/" + a.Val)
 				}()
-
-				//}
-
-				// Now the jobs can be added to the channel, which is used as a queue
-				//for scanner.Scan() {
-				//s := arti + "/" + repo + href
-				//ch <- s
-				//}
-				//close(ch) // This tells the goroutines there's nothing else to do
-				//wg.Wait() // Wait for the threads to finish
 				break
 			}
 		}

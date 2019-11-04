@@ -2,8 +2,8 @@ package main
 
 import (
 	"bytes"
-	"go-npmdl/auth"
-	"go-npmdl/metadata"
+	"go-pkgdl/auth"
+	"go-pkgdl/npm"
 	"log"
 	"os/user"
 	"testing"
@@ -36,7 +36,7 @@ func TestVerifyApiKey(t *testing.T) {
 func TestGetNPMMetadata(t *testing.T) {
 	t.Log("Testing NPM Metadata")
 	creds := userForTesting()
-	metadata.GetNPMMetadata(creds, creds.URL+"/api/npm/"+creds.Repository+"/", "49", "005-http-antao", creds.DlLocation)
+	npm.GetNPMMetadata(creds, creds.URL+"/api/npm/"+creds.Repository+"/", "49", "005-http-antao", creds.DlLocation, "")
 }
 
 func TestGenerateDownloadJSON(t *testing.T) {
@@ -48,6 +48,12 @@ func TestGenerateDownloadJSON(t *testing.T) {
 	// result, err := auth.GenerateDownloadJSON(creds.DlLocation, &stdin)
 	// assert.NoError(t, err)
 	// assert.Equal(t, "hunter2", result)
+}
+
+func TestCheckTypeAndRepoParams(t *testing.T) {
+	t.Log("Testing checkTypeAndRepoParams")
+	creds := userForTesting()
+	checkTypeAndRepoParams(creds)
 }
 
 func userForTesting() auth.Creds {

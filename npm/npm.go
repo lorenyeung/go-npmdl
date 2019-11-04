@@ -32,7 +32,7 @@ type npmIds struct {
 }
 
 //GetNPMMetadata blah
-func GetNPMMetadata(creds auth.Creds, URL, packageIndex, packageName, configPath string) {
+func GetNPMMetadata(creds auth.Creds, URL, packageIndex, packageName, configPath string, dlFolder string) {
 	data, _ := auth.GetRestAPI("GET", true, URL+packageName, creds.Username, creds.Apikey, "")
 	var metadata = metadata{}
 	err := json.Unmarshal([]byte(data), &metadata)
@@ -51,9 +51,9 @@ func GetNPMMetadata(creds auth.Creds, URL, packageIndex, packageName, configPath
 				continue
 			}
 		}
-		log.Println(packageIndex, i, j.Dist.Tarball, configPath+"npmDownloads/"+packageDl)
-		auth.GetRestAPI("GET", true, j.Dist.Tarball, creds.Username, creds.Apikey, configPath+"npmDownloads/"+packageDl)
-		err2 := os.Remove(configPath + "npmDownloads/" + packageDl)
+		log.Println(packageIndex, i, j.Dist.Tarball, configPath+dlFolder+"/"+packageDl)
+		auth.GetRestAPI("GET", true, j.Dist.Tarball, creds.Username, creds.Apikey, configPath+dlFolder+"/"+packageDl)
+		err2 := os.Remove(configPath + dlFolder + "/" + packageDl)
 		helpers.Check(err2, false, "Deleting file")
 	}
 	helpers.Check(err, false, "Reading")

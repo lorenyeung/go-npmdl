@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"flag"
+	"fmt"
 	"go-pkgdl/auth"
 	"go-pkgdl/debian"
 	"go-pkgdl/helpers"
@@ -17,8 +18,7 @@ import (
 
 func main() {
 
-	supportedTypes := [2]string{"debian", "npm"}
-
+	supportedTypes := [3]string{"debian", "npm", "maven"}
 	usr, err := user.Current()
 	if err != nil {
 		log.Fatal(err)
@@ -91,11 +91,16 @@ func main() {
 
 	checkTypeAndRepoParams(creds)
 
+	pkgRepoDlFolder := repoTypeVar + "Downloads"
+
 	//case switch for different package types
 	switch repoTypeVar {
 	case "debian":
 		url := "http://archive.ubuntu.com/ubuntu"
-		debian.GetDebianHrefs(url+"/pool/", url, creds.URL, creds.Repository, configPath, creds, 1, "")
+		debian.GetDebianHrefs(url+"/pool/", url, creds.URL, creds.Repository, configPath, creds, 1, "", pkgRepoDlFolder, workersVar)
+	case "maven":
+		url := "https://jcenter.bintray.com"
+		fmt.Println(url)
 	case "npm":
 		npm.GetNPMJSONList(configPath)
 		npm.GetNPMList(configPath)
@@ -116,7 +121,7 @@ func main() {
 						wg.Done()
 						return
 					}
-					npm.GetNPMMetadata(creds, creds.URL+"/api/npm/"+creds.Repository+"/", s[0], s[1], configPath)
+					npm.GetNPMMetadata(creds, creds.URL+"/api/npm/"+creds.Repository+"/", s[0], s[1], configPath, pkgRepoDlFolder)
 				}
 			}(i)
 		}
@@ -129,7 +134,7 @@ func main() {
 		close(ch) // This tells the goroutines there's nothing else to do
 		wg.Wait() // Wait for the threads to finish
 	default:
-		log.Println("Unsupported package type. We currently support the following:", supportedTypes)
+		log.Println("Unsupported package type", repoTypeVar, ". We currently support the following:", supportedTypes)
 	}
 }
 
