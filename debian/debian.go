@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 
 	"golang.org/x/net/html"
 )
@@ -56,29 +57,29 @@ func checkDebian(t html.Token, url string, base string, arti string, repo string
 				href := strings.TrimPrefix(hrefraw, base)
 
 				//var mutex = &sync.Mutex{} //should help with the concurrent map writes issue
-				//var ch = make(chan []string, workersVar+1)
-				//var wg sync.WaitGroup //multi threading the GET details request
-				//wg.Add(workersVar)
-				//for i := 0; i < workersVar; i++ {
-				go func() {
-					parts := strings.Split(href, "_")
-					arch := strings.TrimSuffix(parts[len(parts)-1], ".deb")
-					dist := "xenial" //hardcoding xenial for now as distibution is stored in the packages file, going to be difficult to parse..
-					fmt.Println("Downloading ", arti+"/"+repo+href, component, arch)
-					auth.GetRestAPI("GET", true, arti+"/"+repo+href, creds.Username, creds.Apikey, configPath+dlFolder+"/"+a.Val)
-					auth.GetRestAPI("PUT", true, arti+"/api/storage/"+repo+"-cache"+href+"?properties=deb.component="+component+";deb.architecture="+arch+";deb.distribution="+dist, creds.Username, creds.Apikey, "")
-					os.Remove(configPath + dlFolder + "/" + a.Val)
-				}()
+				var ch = make(chan string, workersVar+1)
+				var wg sync.WaitGroup //multi threading the GET details request
+				wg.Add(workersVar)
+				for i := 0; i < workersVar; i++ {
+					go func(i int) {
+						parts := strings.Split(href, "_")
+						arch := strings.TrimSuffix(parts[len(parts)-1], ".deb")
+						dist := "xenial" //hardcoding xenial for now as distibution is stored in the packages file, going to be difficult to parse..
+						fmt.Println("Downloading ", arti+"/"+repo+href, component, arch)
+						auth.GetRestAPI("GET", false, arti+"/"+repo+href, creds.Username, creds.Apikey, configPath+dlFolder+"/"+a.Val)
+						auth.GetRestAPI("PUT", false, arti+"/api/storage/"+repo+"-cache"+href+"?properties=deb.component="+component+";deb.architecture="+arch+";deb.distribution="+dist, creds.Username, creds.Apikey, "")
+						os.Remove(configPath + dlFolder + "/" + a.Val)
+					}(i)
 
-				//}
+				}
 
-				// Now the jobs can be added to the channel, which is used as a queue
+				//Now the jobs can be added to the channel, which is used as a queue
 				//for scanner.Scan() {
-				//s := arti + "/" + repo + href
-				//ch <- s
+				s := arti + "/" + repo + href
+				ch <- s
 				//}
-				//close(ch) // This tells the goroutines there's nothing else to do
-				//wg.Wait() // Wait for the threads to finish
+				close(ch) // This tells the goroutines there's nothing else to do
+				wg.Wait() // Wait for the threads to finish
 				break
 			}
 		}
