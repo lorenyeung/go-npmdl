@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"container/list"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -9,16 +10,18 @@ import (
 	"go-pkgdl/debian"
 	"go-pkgdl/helpers"
 	"go-pkgdl/npm"
+	"go-pkgdl/pypi"
 	"log"
 	"os"
 	"os/user"
 	"strings"
 	"sync"
+	"time"
 )
 
 func main() {
 
-	supportedTypes := [3]string{"debian", "npm", "maven"}
+	supportedTypes := [4]string{"debian", "maven", "npm", "pypi"}
 	usr, err := user.Current()
 	if err != nil {
 		log.Fatal(err)
@@ -26,16 +29,16 @@ func main() {
 	configFolder := "/.lorenygo/pkgDownloader/"
 	configPath := usr.HomeDir + configFolder
 
+	log.Println("Checking existence of download folders for:", supportedTypes)
 	for i := 0; i < len(supportedTypes); i++ {
-		log.Println("Checking that", supportedTypes[i], "downloads folder exists")
 		if _, err := os.Stat(configPath + supportedTypes[i] + "Downloads/"); os.IsNotExist(err) {
 			log.Println("No config folder found")
 			err = os.MkdirAll(configPath+supportedTypes[i]+"Downloads/", 0700)
 			helpers.Check(err, true, "Generating "+configPath+" directory")
 		} else {
-			log.Println(supportedTypes[i], "downloads folder exists, continuing..")
 		}
 	}
+	log.Println("Done checking existence for:", supportedTypes)
 	//TODO clean up downloads dir beforehand
 
 	masterKey := auth.VerifyMasterKey(configPath + "master.key")
@@ -77,6 +80,11 @@ func main() {
 			log.Println("Looks like there's an issue with your credentials file. Reseting")
 			auth.GenerateDownloadJSON(configPath+"download.json", true, masterKey)
 			creds = auth.GetDownloadJSON(configPath+"download.json", masterKey)
+			usernameVar = creds.Username
+			apikeyVar = creds.Apikey
+			urlVar = creds.URL
+			repoVar = creds.Repository
+
 		} else {
 			log.Println("Looks like there's an issue with your custom credentials. Exiting")
 			os.Exit(1)
@@ -96,8 +104,42 @@ func main() {
 	//case switch for different package types
 	switch repoTypeVar {
 	case "debian":
+		debianWorkQueue := list.New()
 		url := "http://archive.ubuntu.com/ubuntu"
-		debian.GetDebianHrefs(url+"/pool/", url, creds.URL, creds.Repository, configPath, creds, 1, "", pkgRepoDlFolder, workersVar)
+		go func() {
+			debian.GetDebianHrefs(url+"/pool/", url, creds.URL, creds.Repository, configPath, creds, 1, "", pkgRepoDlFolder, workersVar, debianWorkQueue)
+
+		}()
+		var ch = make(chan interface{}, workersVar+1)
+		var wg sync.WaitGroup
+		for i := 0; i < workersVar; i++ {
+			go func(i int) {
+				for {
+					s, ok := <-ch
+					if !ok {
+						wg.Done()
+						return
+					}
+					md := s.(debian.Metadata)
+					fmt.Println("Downloading", creds.URL+"/"+creds.Repository+md.Url)
+					auth.GetRestAPI("GET", false, creds.URL+"/"+creds.Repository+md.Url, creds.Username, creds.Apikey, configPath+pkgRepoDlFolder+"/"+md.File)
+					auth.GetRestAPI("PUT", false, creds.URL+"/api/storage/"+creds.Repository+"-cache"+md.Url+"?properties=deb.component="+md.Component+";deb.architecture="+md.Architecture+";deb.distribution="+md.Distribution, creds.Username, creds.Apikey, "")
+					os.Remove(configPath + pkgRepoDlFolder + "/" + md.File)
+				}
+			}(i)
+		}
+		for {
+			for debianWorkQueue.Len() == 0 {
+				log.Println("Debian work queue is empty, sleeping for 5 seconds...")
+				time.Sleep(5 * time.Second)
+			}
+			s := debianWorkQueue.Front().Value
+			debianWorkQueue.Remove(debianWorkQueue.Front())
+			ch <- s
+		}
+		close(ch)
+		wg.Wait()
+
 	case "maven":
 		url := "https://jcenter.bintray.com"
 		fmt.Println(url)
@@ -133,6 +175,9 @@ func main() {
 		}
 		close(ch) // This tells the goroutines there's nothing else to do
 		wg.Wait() // Wait for the threads to finish
+	case "pypi":
+		url := "https://pypi.org"
+		pypi.GetPypiHrefs(url+"/simple/", url, creds.URL, creds.Repository, configPath, creds, 1, "", pkgRepoDlFolder)
 	default:
 		log.Println("Unsupported package type", repoTypeVar, ". We currently support the following:", supportedTypes)
 	}
