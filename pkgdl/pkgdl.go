@@ -8,8 +8,10 @@ import (
 	"go-pkgdl/auth"
 	"go-pkgdl/debian"
 	"go-pkgdl/helpers"
+	"go-pkgdl/maven"
 	"go-pkgdl/npm"
 	"go-pkgdl/pypi"
+
 	"log"
 	"os"
 	"os/user"
@@ -103,15 +105,17 @@ func main() {
 	workQueue := list.New()
 	switch repoTypeVar {
 	case "debian":
-
 		url := "http://archive.ubuntu.com/ubuntu"
 		go func() {
-			debian.GetDebianHrefs(url+"/pool/", url, creds.URL, creds.Repository, configPath, creds, 1, "", pkgRepoDlFolder, workersVar, workQueue)
+			//func GetDebianHrefs(url string, base string, index int, component string, debianWorkerQueue *list.List) string {
+			debian.GetDebianHrefs(url+"/pool/", url, 1, "", workQueue)
 		}()
 
 	case "maven":
 		url := "https://jcenter.bintray.com"
-		fmt.Println(url)
+		go func() {
+			maven.GetMavenHrefs(url+"/", url, 1, "", workQueue)
+		}()
 	case "npm":
 		npm.GetNPMList(configPath, workQueue)
 

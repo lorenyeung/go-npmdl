@@ -3,7 +3,6 @@ package debian
 import (
 	"container/list"
 	"fmt"
-	"go-pkgdl/auth"
 	"go-pkgdl/helpers"
 	"net/http"
 	"strings"
@@ -21,7 +20,7 @@ type Metadata struct {
 }
 
 //GetDebianHrefs parse hrefs for debian files
-func GetDebianHrefs(url string, base string, arti string, repo string, configPath string, creds auth.Creds, index int, component string, dlFolder string, workers int, debianWorkerQueue *list.List) string {
+func GetDebianHrefs(url string, base string, index int, component string, debianWorkerQueue *list.List) string {
 	resp, err := http.Get(url)
 	// this needs to be threaded better..
 	helpers.Check(err, false, "HTTP GET error")
@@ -47,17 +46,17 @@ func GetDebianHrefs(url string, base string, arti string, repo string, configPat
 						if index == 1 {
 							component = strings.TrimSuffix(a.Val, "/")
 						}
-						GetDebianHrefs(url+a.Val, base, arti, repo, configPath, creds, index+1, component, dlFolder, workers, debianWorkerQueue)
+						GetDebianHrefs(url+a.Val, base, index+1, component, debianWorkerQueue)
 						break
 					}
 				}
-				checkDebian(t, url, base, arti, repo, configPath, creds, index, component, dlFolder, workers, debianWorkerQueue)
+				checkDebian(t, url, base, component, debianWorkerQueue)
 			}
 		}
 	}
 }
 
-func checkDebian(t html.Token, url string, base string, arti string, repo string, configPath string, creds auth.Creds, index int, component string, dlFolder string, workersVar int, debianWorkerQueue *list.List) {
+func checkDebian(t html.Token, url string, base string, component string, debianWorkerQueue *list.List) {
 	if strings.Contains(t.String(), ".deb") {
 		for _, a := range t.Attr {
 			if a.Key == "href" && (strings.HasSuffix(a.Val, ".deb")) {
@@ -66,8 +65,8 @@ func checkDebian(t html.Token, url string, base string, arti string, repo string
 
 				parts := strings.Split(href, "_")
 				arch := strings.TrimSuffix(parts[len(parts)-1], ".deb")
-				dist := "xenial" //hardcoding xenial for now as distibution is stored in the packages file, going to be difficult to parse..
-				fmt.Println("queuing ", arti+"/"+repo+href, component, arch, dist, debianWorkerQueue.Len())
+				dist := "xenial" //hardcoding xenial for now as distribution is stored in the packages file, going to be difficult to parse..
+				fmt.Println("queuing download", href, component, arch, dist, debianWorkerQueue.Len())
 
 				//add debian metadata to queue
 				var debianMd Metadata
@@ -77,9 +76,6 @@ func checkDebian(t html.Token, url string, base string, arti string, repo string
 				debianMd.Distribution = dist
 				debianMd.File = a.Val
 				debianWorkerQueue.PushBack(debianMd)
-				//auth.GetRestAPI("GET", false, arti+"/"+repo+href, creds.Username, creds.Apikey, configPath+dlFolder+"/"+a.Val)
-				//auth.GetRestAPI("PUT", false, arti+"/api/storage/"+repo+"-cache"+href+"?properties=deb.component="+component+";deb.architecture="+arch+";deb.distribution="+dist, creds.Username, creds.Apikey, "")
-				//os.Remove(configPath + dlFolder + "/" + a.Val)
 				break
 			}
 		}

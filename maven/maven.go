@@ -1,20 +1,29 @@
 package maven
 
 import (
+	"container/list"
 	"fmt"
-	"go-pkgdl/auth"
 	"go-pkgdl/helpers"
 	"net/http"
-	"os"
 	"strings"
 
 	"golang.org/x/net/html"
 )
 
-//GetMavenHrefs parse hrefs for debian files
-func GetMavenHrefs(url string, base string, arti string, repo string, configPath string, creds auth.Creds, index int, component string, dlFolder string) string {
+//Metadata struct of debian metadata object
+type Metadata struct {
+	Url          string
+	Component    string
+	Architecture string
+	Distribution string
+	File         string
+}
+
+//GetMavenHrefs parse hrefs for Maven files
+func GetMavenHrefs(url string, base string, index int, component string, MavenWorkerQueue *list.List) string {
 	resp, err := http.Get(url)
-	helpers.Check(err, true, "HTTP GET error")
+	// this needs to be threaded better..
+	helpers.Check(err, false, "HTTP GET error")
 	defer resp.Body.Close()
 
 	z := html.NewTokenizer(resp.Body)
@@ -27,7 +36,7 @@ func GetMavenHrefs(url string, base string, arti string, repo string, configPath
 			return ""
 		case tt == html.StartTagToken:
 			t := z.Token()
-
+			fmt.Println(t)
 			isAnchor := t.Data == "a"
 			if isAnchor {
 
@@ -37,31 +46,36 @@ func GetMavenHrefs(url string, base string, arti string, repo string, configPath
 						if index == 1 {
 							component = strings.TrimSuffix(a.Val, "/")
 						}
-						GetMavenHrefs(url+a.Val, base, arti, repo, configPath, creds, index+1, component, dlFolder)
+						GetMavenHrefs(url+a.Val, base, index+1, component, MavenWorkerQueue)
 						break
 					}
 				}
-				checkMaven(t, url, base, arti, repo, configPath, creds, index, component, dlFolder)
+				checkMaven(t, url, base, component, MavenWorkerQueue)
 			}
 		}
 	}
 }
 
-func checkMaven(t html.Token, url string, base string, arti string, repo string, configPath string, creds auth.Creds, index int, component string, dlFolder string) {
+func checkMaven(t html.Token, url string, base string, component string, MavenWorkerQueue *list.List) {
 	if strings.Contains(t.String(), ".deb") {
 		for _, a := range t.Attr {
 			if a.Key == "href" && (strings.HasSuffix(a.Val, ".deb")) {
 				hrefraw := url + a.Val
 				href := strings.TrimPrefix(hrefraw, base)
-				go func() {
-					parts := strings.Split(href, "_")
-					arch := strings.TrimSuffix(parts[len(parts)-1], ".deb")
-					dist := "xenial" //hardcoding xenial for now as distibution is stored in the packages file, going to be difficult to parse..
-					fmt.Println("Downloading ", arti+"/"+repo+href, component, arch)
-					auth.GetRestAPI("GET", true, arti+"/"+repo+href, creds.Username, creds.Apikey, configPath+dlFolder+"/"+a.Val)
-					auth.GetRestAPI("PUT", true, arti+"/api/storage/"+repo+"-cache"+href+"?properties=deb.component="+component+";deb.architecture="+arch+";deb.distribution="+dist, creds.Username, creds.Apikey, "")
-					os.Remove(configPath + dlFolder + "/" + a.Val)
-				}()
+
+				parts := strings.Split(href, "_")
+				arch := strings.TrimSuffix(parts[len(parts)-1], ".deb")
+				dist := "xenial" //hardcoding xenial for now as distribution is stored in the packages file, going to be difficult to parse..
+				fmt.Println("queuing download", href, component, arch, dist, MavenWorkerQueue.Len())
+
+				//add Maven metadata to queue
+				var MavenMd Metadata
+				MavenMd.Url = href
+				MavenMd.Component = component
+				MavenMd.Architecture = arch
+				MavenMd.Distribution = dist
+				MavenMd.File = a.Val
+				MavenWorkerQueue.PushBack(MavenMd)
 				break
 			}
 		}
