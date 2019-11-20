@@ -4,7 +4,6 @@ import (
 	"container/list"
 	"encoding/json"
 	"flag"
-	"fmt"
 	"go-pkgdl/auth"
 	"go-pkgdl/debian"
 	"go-pkgdl/helpers"
@@ -114,7 +113,7 @@ func main() {
 	case "maven":
 		url := "https://jcenter.bintray.com"
 		go func() {
-			maven.GetMavenHrefs(url+"/", url, 1, "", workQueue)
+			maven.GetMavenHrefs(url+"/", url, workQueue)
 		}()
 	case "npm":
 		npm.GetNPMList(configPath, workQueue)
@@ -140,17 +139,13 @@ func main() {
 				switch repoTypeVar {
 				case "debian":
 					md := s.(debian.Metadata)
-
-					_, headStatusCode := auth.GetRestAPI("HEAD", true, creds.URL+"/"+creds.Repository+"-cache/"+md.Url, creds.Username, creds.Apikey, "")
-					if headStatusCode == 200 {
-						log.Printf("skipping, got 200 on HEAD request for %s\n", creds.URL+"/"+creds.Repository+"-cache/"+md.Url)
-						continue
-					}
-
-					fmt.Println("Downloading", creds.URL+"/"+creds.Repository+md.Url)
-					auth.GetRestAPI("GET", false, creds.URL+"/"+creds.Repository+md.Url, creds.Username, creds.Apikey, configPath+pkgRepoDlFolder+"/"+md.File)
+					standardDownload(creds, md.Url, md.File, configPath, pkgRepoDlFolder)
 					auth.GetRestAPI("PUT", false, creds.URL+"/api/storage/"+creds.Repository+"-cache"+md.Url+"?properties=deb.component="+md.Component+";deb.architecture="+md.Architecture+";deb.distribution="+md.Distribution, creds.Username, creds.Apikey, "")
-					os.Remove(configPath + pkgRepoDlFolder + "/" + md.File)
+
+				case "maven":
+					md := s.(maven.Metadata)
+					standardDownload(creds, md.Url, md.File, configPath, pkgRepoDlFolder)
+
 				case "npm":
 					md := s.(npm.Metadata)
 					npm.GetNPMMetadata(creds, creds.URL+"/api/npm/"+creds.Repository+"/", md.ID, md.Package, configPath, pkgRepoDlFolder)
@@ -169,6 +164,19 @@ func main() {
 	}
 	close(ch)
 	wg.Wait()
+
+}
+
+func standardDownload(creds auth.Creds, dlURL string, file string, configPath string, pkgRepoDlFolder string) {
+	_, headStatusCode := auth.GetRestAPI("HEAD", true, creds.URL+"/"+creds.Repository+"-cache/"+dlURL, creds.Username, creds.Apikey, "")
+	if headStatusCode == 200 {
+		log.Printf("skipping, got 200 on HEAD request for %s\n", creds.URL+"/"+creds.Repository+"-cache/"+dlURL)
+		return
+	}
+
+	log.Println("Downloading", creds.URL+"/"+creds.Repository+dlURL)
+	auth.GetRestAPI("GET", false, creds.URL+"/"+creds.Repository+dlURL, creds.Username, creds.Apikey, configPath+pkgRepoDlFolder+"/"+file)
+	os.Remove(configPath + pkgRepoDlFolder + "/" + file)
 
 }
 
