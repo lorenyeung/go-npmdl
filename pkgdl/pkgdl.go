@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"container/list"
 	"encoding/json"
 	"flag"
@@ -14,7 +13,6 @@ import (
 	"log"
 	"os"
 	"os/user"
-	"strings"
 	"sync"
 	"time"
 )
@@ -102,85 +100,72 @@ func main() {
 	pkgRepoDlFolder := repoTypeVar + "Downloads"
 
 	//case switch for different package types
+	workQueue := list.New()
 	switch repoTypeVar {
 	case "debian":
-		debianWorkQueue := list.New()
+
 		url := "http://archive.ubuntu.com/ubuntu"
 		go func() {
-			debian.GetDebianHrefs(url+"/pool/", url, creds.URL, creds.Repository, configPath, creds, 1, "", pkgRepoDlFolder, workersVar, debianWorkQueue)
-
+			debian.GetDebianHrefs(url+"/pool/", url, creds.URL, creds.Repository, configPath, creds, 1, "", pkgRepoDlFolder, workersVar, workQueue)
 		}()
-		var ch = make(chan interface{}, workersVar+1)
-		var wg sync.WaitGroup
-		for i := 0; i < workersVar; i++ {
-			go func(i int) {
-				for {
-					s, ok := <-ch
-					if !ok {
-						wg.Done()
-						return
-					}
-					md := s.(debian.Metadata)
-					fmt.Println("Downloading", creds.URL+"/"+creds.Repository+md.Url)
-					auth.GetRestAPI("GET", false, creds.URL+"/"+creds.Repository+md.Url, creds.Username, creds.Apikey, configPath+pkgRepoDlFolder+"/"+md.File)
-					auth.GetRestAPI("PUT", false, creds.URL+"/api/storage/"+creds.Repository+"-cache"+md.Url+"?properties=deb.component="+md.Component+";deb.architecture="+md.Architecture+";deb.distribution="+md.Distribution, creds.Username, creds.Apikey, "")
-					os.Remove(configPath + pkgRepoDlFolder + "/" + md.File)
-				}
-			}(i)
-		}
-		for {
-			for debianWorkQueue.Len() == 0 {
-				log.Println("Debian work queue is empty, sleeping for 5 seconds...")
-				time.Sleep(5 * time.Second)
-			}
-			s := debianWorkQueue.Front().Value
-			debianWorkQueue.Remove(debianWorkQueue.Front())
-			ch <- s
-		}
-		close(ch)
-		wg.Wait()
 
 	case "maven":
 		url := "https://jcenter.bintray.com"
 		fmt.Println(url)
 	case "npm":
-		npm.GetNPMJSONList(configPath)
-		npm.GetNPMList(configPath)
-		file, err := os.Open(configPath + "all-npm-id.txt")
-		helpers.Check(err, true, "npm id read")
-		defer file.Close()
-		scanner := bufio.NewScanner(file)
+		npm.GetNPMList(configPath, workQueue)
 
-		//var mutex = &sync.Mutex{} //should help with the concurrent map writes issue
-		var ch = make(chan []string, workersVar+1)
-		var wg sync.WaitGroup //multi threading the GET details request
-		wg.Add(workersVar)
-		for i := 0; i < workersVar; i++ {
-			go func(i int) {
-				for {
-					s, ok := <-ch
-					if !ok { // if there is nothing to do and the channel has been closed then end the goroutine
-						wg.Done()
-						return
-					}
-					npm.GetNPMMetadata(creds, creds.URL+"/api/npm/"+creds.Repository+"/", s[0], s[1], configPath, pkgRepoDlFolder)
-				}
-			}(i)
-		}
-
-		// Now the jobs can be added to the channel, which is used as a queue
-		for scanner.Scan() {
-			s := strings.Fields(scanner.Text())
-			ch <- s
-		}
-		close(ch) // This tells the goroutines there's nothing else to do
-		wg.Wait() // Wait for the threads to finish
 	case "pypi":
 		url := "https://pypi.org"
 		pypi.GetPypiHrefs(url+"/simple/", url, creds.URL, creds.Repository, configPath, creds, 1, "", pkgRepoDlFolder)
 	default:
 		log.Println("Unsupported package type", repoTypeVar, ". We currently support the following:", supportedTypes)
 	}
+
+	//work queue
+	var ch = make(chan interface{}, workersVar+1)
+	var wg sync.WaitGroup
+	for i := 0; i < workersVar; i++ {
+		go func(i int) {
+			for {
+				s, ok := <-ch
+				if !ok {
+					wg.Done()
+					return
+				}
+				switch repoTypeVar {
+				case "debian":
+					md := s.(debian.Metadata)
+
+					_, headStatusCode := auth.GetRestAPI("HEAD", true, creds.URL+"/"+creds.Repository+"-cache/"+md.Url, creds.Username, creds.Apikey, "")
+					if headStatusCode == 200 {
+						log.Printf("skipping, got 200 on HEAD request for %s\n", creds.URL+"/"+creds.Repository+"-cache/"+md.Url)
+						continue
+					}
+
+					fmt.Println("Downloading", creds.URL+"/"+creds.Repository+md.Url)
+					auth.GetRestAPI("GET", false, creds.URL+"/"+creds.Repository+md.Url, creds.Username, creds.Apikey, configPath+pkgRepoDlFolder+"/"+md.File)
+					auth.GetRestAPI("PUT", false, creds.URL+"/api/storage/"+creds.Repository+"-cache"+md.Url+"?properties=deb.component="+md.Component+";deb.architecture="+md.Architecture+";deb.distribution="+md.Distribution, creds.Username, creds.Apikey, "")
+					os.Remove(configPath + pkgRepoDlFolder + "/" + md.File)
+				case "npm":
+					md := s.(npm.Metadata)
+					npm.GetNPMMetadata(creds, creds.URL+"/api/npm/"+creds.Repository+"/", md.ID, md.Package, configPath, pkgRepoDlFolder)
+				}
+			}
+		}(i)
+	}
+	for {
+		for workQueue.Len() == 0 {
+			log.Println(repoTypeVar, "work queue is empty, sleeping for 5 seconds...")
+			time.Sleep(5 * time.Second)
+		}
+		s := workQueue.Front().Value
+		workQueue.Remove(workQueue.Front())
+		ch <- s
+	}
+	close(ch)
+	wg.Wait()
+
 }
 
 //Test if remote repository exists and is a remote

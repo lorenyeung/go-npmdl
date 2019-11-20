@@ -1,7 +1,7 @@
 package npm
 
 import (
-	"bufio"
+	"container/list"
 	"encoding/json"
 	"fmt"
 	"go-pkgdl/auth"
@@ -14,7 +14,7 @@ import (
 )
 
 //Metadata blah
-type metadata struct {
+type artifactMetadata struct {
 	Versions map[string]distMetadata
 }
 
@@ -25,16 +25,19 @@ type distMetadata struct {
 	} `json:"dist"`
 }
 
-type npmIds struct {
+//Metadata for worker queue
+type Metadata struct {
 	Rows []struct {
 		ID string `json:"id"`
 	} `json:"rows"`
+	ID      string
+	Package string
 }
 
 //GetNPMMetadata blah
 func GetNPMMetadata(creds auth.Creds, URL, packageIndex, packageName, configPath string, dlFolder string) {
 	data, _ := auth.GetRestAPI("GET", true, URL+packageName, creds.Username, creds.Apikey, "")
-	var metadata = metadata{}
+	var metadata = artifactMetadata{}
 	err := json.Unmarshal([]byte(data), &metadata)
 	if err != nil {
 		fmt.Println("error:" + err.Error())
@@ -62,34 +65,21 @@ func GetNPMMetadata(creds auth.Creds, URL, packageIndex, packageName, configPath
 	}
 }
 
-//GetNPMJSONList function to collect raw npm list of packages
-func GetNPMJSONList(configPath string) {
+//GetNPMList function to convert raw list into readable text file
+func GetNPMList(configPath string, npmWorkQueue *list.List) {
 	if _, err := os.Stat(configPath + "all-npm.json"); os.IsNotExist(err) {
 		log.Println("No all-npm.json found, creating...")
 		auth.GetRestAPI("GET", false, "https://replicate.npmjs.com/_all_docs", "", "", configPath+"all-npm.json")
 	}
-}
-
-//GetNPMList function to convert raw list into readable text file
-func GetNPMList(configPath string) {
-	if _, err := os.Stat(configPath + "all-npm-id.txt"); os.IsNotExist(err) {
-		log.Println("No all-npm-id.txt found, creating...")
-		var result npmIds
-
-		file, err := os.Open(configPath + "all-npm.json")
-
-		helpers.Check(err, true, "npm JSON read")
-		writeFile, err := os.OpenFile(configPath+"all-npm-id.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-		helpers.Check(err, true, "npm id write")
-		defer file.Close()
-		datawriter := bufio.NewWriter(writeFile)
-		byteValue, _ := ioutil.ReadAll(file)
-		json.Unmarshal([]byte(byteValue), &result)
-		for i, j := range result.Rows {
-			t := strconv.Itoa(i)
-			_, _ = datawriter.WriteString(string(t) + " " + j.ID + "\n")
-		}
-		datawriter.Flush()
-		writeFile.Close()
+	var result Metadata
+	file, err := os.Open(configPath + "all-npm.json")
+	helpers.Check(err, true, "npm JSON read")
+	byteValue, _ := ioutil.ReadAll(file)
+	json.Unmarshal([]byte(byteValue), &result)
+	for i, j := range result.Rows {
+		t := strconv.Itoa(i)
+		result.ID = t
+		result.Package = j.ID
+		npmWorkQueue.PushBack(result)
 	}
 }
