@@ -1,20 +1,24 @@
 package pypi
 
 import (
+	"container/list"
 	"fmt"
-	"go-pkgdl/auth"
 	"go-pkgdl/helpers"
-	"log"
 	"net/http"
-	"os"
 	"strings"
 
 	"golang.org/x/net/html"
 )
 
+//Metadata struct of debian metadata object
+type Metadata struct {
+	Url  string
+	File string
+}
+
 //GetPypiHrefs parse hrefs for debian files
-func GetPypiHrefs(url string, base string, arti string, repo string, configPath string, creds auth.Creds, index int, component string, dlFolder string) string {
-	resp, err := http.Get(url)
+func GetPypiHrefs(registry string, registryBase string, url string, pypiWorkerQueue *list.List) string {
+	resp, err := http.Get(registry)
 	helpers.Check(err, true, "HTTP GET error")
 	defer resp.Body.Close()
 
@@ -30,41 +34,37 @@ func GetPypiHrefs(url string, base string, arti string, repo string, configPath 
 			t := z.Token()
 
 			isAnchor := t.Data == "a"
-			if isAnchor {
 
+			if isAnchor {
 				// recursive look
 				for _, a := range t.Attr {
-					log.Println("raw A", a)
 					if a.Key == "href" && (strings.HasSuffix(a.Val, "/")) {
-						if index == 1 {
-							component = strings.TrimSuffix(a.Val, "/")
-						}
-						GetPypiHrefs(url+a.Val, base, arti, repo, configPath, creds, index+1, component, dlFolder)
-						//break
+						GetPypiHrefs(registryBase+a.Val, registryBase, url, pypiWorkerQueue)
+						break
 					}
 				}
-				checkPypi(t, url, base, arti, repo, configPath, creds, index, component, dlFolder)
+				checkPypi(t, registry, registryBase, url, pypiWorkerQueue)
 			}
 		}
 	}
 }
 
-func checkPypi(t html.Token, url string, base string, arti string, repo string, configPath string, creds auth.Creds, index int, component string, dlFolder string) {
-	log.Println("check pypi", t)
-	if strings.Contains(t.String(), ".deb") {
+func checkPypi(t html.Token, registry string, registryBase string, url string, pypiWorkerQueue *list.List) {
+	if strings.Contains(t.String(), "#sha256") {
 		for _, a := range t.Attr {
-			if a.Key == "href" && (strings.HasSuffix(a.Val, ".deb")) {
-				hrefraw := url + a.Val
-				href := strings.TrimPrefix(hrefraw, base)
-				go func() {
-					parts := strings.Split(href, "_")
-					arch := strings.TrimSuffix(parts[len(parts)-1], ".deb")
-					dist := "xenial" //hardcoding xenial for now as distibution is stored in the packages file, going to be difficult to parse..
-					fmt.Println("Downloading ", arti+"/"+repo+href, component, arch)
-					auth.GetRestAPI("GET", true, arti+"/"+repo+href, creds.Username, creds.Apikey, configPath+dlFolder+"/"+a.Val)
-					auth.GetRestAPI("PUT", true, arti+"/api/storage/"+repo+"-cache"+href+"?properties=deb.component="+component+";deb.architecture="+arch+";deb.distribution="+dist, creds.Username, creds.Apikey, "")
-					os.Remove(configPath + dlFolder + "/" + a.Val)
-				}()
+
+			if a.Key == "href" && (strings.Contains(t.String(), "#sha256")) {
+				parts := strings.Split(a.Val, "#sha256")
+				hrefraw := parts[0]
+				href := strings.TrimPrefix(hrefraw, url)
+				file := strings.Split(parts[0], "/")
+
+				fmt.Println("Queuing download", href, pypiWorkerQueue.Len())
+				//add pypi metadata to queue
+				var pypiMd Metadata
+				pypiMd.Url = href
+				pypiMd.File = file[len(file)-1]
+				pypiWorkerQueue.PushBack(pypiMd)
 				break
 			}
 		}

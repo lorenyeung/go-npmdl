@@ -41,6 +41,7 @@ func GetDebianHrefs(url string, base string, index int, component string, debian
 			if isAnchor {
 
 				// recursive look
+
 				for _, a := range t.Attr {
 					if a.Key == "href" && (strings.HasSuffix(a.Val, "/")) {
 						if index == 1 {
@@ -50,6 +51,7 @@ func GetDebianHrefs(url string, base string, index int, component string, debian
 						break
 					}
 				}
+
 				checkDebian(t, url, base, component, debianWorkerQueue)
 			}
 		}

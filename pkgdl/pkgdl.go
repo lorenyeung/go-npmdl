@@ -119,8 +119,12 @@ func main() {
 		npm.GetNPMList(configPath, workQueue)
 
 	case "pypi":
-		url := "https://pypi.org"
-		pypi.GetPypiHrefs(url+"/simple/", url, creds.URL, creds.Repository, configPath, creds, 1, "", pkgRepoDlFolder)
+		go func() {
+			registry := "https://pypi.org"
+			url := "https://files.pythonhosted.org"
+			pypi.GetPypiHrefs(registry+"/simple/", registry, url, workQueue)
+		}()
+
 	default:
 		log.Println("Unsupported package type", repoTypeVar, ". We currently support the following:", supportedTypes)
 	}
@@ -149,6 +153,10 @@ func main() {
 				case "npm":
 					md := s.(npm.Metadata)
 					npm.GetNPMMetadata(creds, creds.URL+"/api/npm/"+creds.Repository+"/", md.ID, md.Package, configPath, pkgRepoDlFolder)
+
+				case "pypi":
+					md := s.(pypi.Metadata)
+					standardDownload(creds, md.Url, md.File, configPath, pkgRepoDlFolder)
 				}
 			}
 		}(i)
