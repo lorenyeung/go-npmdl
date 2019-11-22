@@ -12,7 +12,7 @@ import (
 
 //Metadata struct of debian metadata object
 type Metadata struct {
-	Url  string
+	URL  string
 	File string
 }
 
@@ -63,8 +63,7 @@ func checkMaven(t html.Token, url string, base string, MavenWorkerQueue *list.Li
 
 				//add Maven metadata to queue
 				var MavenMd Metadata
-				MavenMd.Url = strings.Replace(href, ":", "", -1)
-				fmt.Println(MavenMd.Url)
+				MavenMd.URL = strings.Replace(href, ":", "", -1)
 				MavenMd.File = strings.TrimPrefix(a.Val, ":")
 				MavenWorkerQueue.PushBack(MavenMd)
 				break

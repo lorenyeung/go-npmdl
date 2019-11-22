@@ -12,7 +12,7 @@ import (
 
 //Metadata struct of debian metadata object
 type Metadata struct {
-	Url  string
+	URL  string
 	File string
 }
 
@@ -62,7 +62,7 @@ func checkPypi(t html.Token, registry string, registryBase string, url string, p
 				fmt.Println("Queuing download", href, pypiWorkerQueue.Len())
 				//add pypi metadata to queue
 				var pypiMd Metadata
-				pypiMd.Url = href
+				pypiMd.URL = href
 				pypiMd.File = file[len(file)-1]
 				pypiWorkerQueue.PushBack(pypiMd)
 				break

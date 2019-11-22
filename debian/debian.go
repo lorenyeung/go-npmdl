@@ -12,7 +12,7 @@ import (
 
 //Metadata struct of debian metadata object
 type Metadata struct {
-	Url          string
+	URL          string
 	Component    string
 	Architecture string
 	Distribution string
@@ -72,7 +72,7 @@ func checkDebian(t html.Token, url string, base string, component string, debian
 
 				//add debian metadata to queue
 				var debianMd Metadata
-				debianMd.Url = href
+				debianMd.URL = href
 				debianMd.Component = component
 				debianMd.Architecture = arch
 				debianMd.Distribution = dist

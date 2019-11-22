@@ -10,6 +10,7 @@ import (
 	"go-pkgdl/maven"
 	"go-pkgdl/npm"
 	"go-pkgdl/pypi"
+	"go-pkgdl/rpm"
 
 	"log"
 	"os"
@@ -20,7 +21,7 @@ import (
 
 func main() {
 
-	supportedTypes := [4]string{"debian", "maven", "npm", "pypi"}
+	supportedTypes := [5]string{"debian", "maven", "npm", "pypi", "rpm"}
 	usr, err := user.Current()
 	if err != nil {
 		log.Fatal(err)
@@ -76,7 +77,7 @@ func main() {
 	}
 	if !auth.VerifyAPIKey(urlVar, usernameVar, apikeyVar) {
 		if creds.Username == usernameVar && creds.Apikey == apikeyVar && creds.URL == urlVar {
-			log.Println("Looks like there's an issue with your credentials file. Reseting")
+			log.Println("Looks like there's an issue with your credentials file. Resetting")
 			auth.GenerateDownloadJSON(configPath+"download.json", true, masterKey)
 			creds = auth.GetDownloadJSON(configPath+"download.json", masterKey)
 			usernameVar = creds.Username
@@ -125,6 +126,13 @@ func main() {
 			pypi.GetPypiHrefs(registry+"/simple/", registry, url, workQueue)
 		}()
 
+	case "rpm":
+		go func() {
+			log.Print("rpm takes 10 seconds to init, please be patient")
+			url := "http://mirror.centos.org"
+			rpm.GetRpmHrefs(url+"/centos/", url, workQueue)
+		}()
+
 	default:
 		log.Println("Unsupported package type", repoTypeVar, ". We currently support the following:", supportedTypes)
 	}
@@ -143,12 +151,12 @@ func main() {
 				switch repoTypeVar {
 				case "debian":
 					md := s.(debian.Metadata)
-					standardDownload(creds, md.Url, md.File, configPath, pkgRepoDlFolder)
-					auth.GetRestAPI("PUT", false, creds.URL+"/api/storage/"+creds.Repository+"-cache"+md.Url+"?properties=deb.component="+md.Component+";deb.architecture="+md.Architecture+";deb.distribution="+md.Distribution, creds.Username, creds.Apikey, "")
+					standardDownload(creds, md.URL, md.File, configPath, pkgRepoDlFolder)
+					auth.GetRestAPI("PUT", false, creds.URL+"/api/storage/"+creds.Repository+"-cache"+md.URL+"?properties=deb.component="+md.Component+";deb.architecture="+md.Architecture+";deb.distribution="+md.Distribution, creds.Username, creds.Apikey, "")
 
 				case "maven":
 					md := s.(maven.Metadata)
-					standardDownload(creds, md.Url, md.File, configPath, pkgRepoDlFolder)
+					standardDownload(creds, md.URL, md.File, configPath, pkgRepoDlFolder)
 
 				case "npm":
 					md := s.(npm.Metadata)
@@ -156,7 +164,11 @@ func main() {
 
 				case "pypi":
 					md := s.(pypi.Metadata)
-					standardDownload(creds, md.Url, md.File, configPath, pkgRepoDlFolder)
+					standardDownload(creds, md.URL, md.File, configPath, pkgRepoDlFolder)
+
+				case "rpm":
+					md := s.(rpm.Metadata)
+					standardDownload(creds, md.URL, md.File, configPath, pkgRepoDlFolder)
 				}
 			}
 		}(i)
