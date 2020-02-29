@@ -47,7 +47,7 @@ func main() {
 	creds := auth.GetDownloadJSON(configPath+"download.json", masterKey)
 
 	var workersVar int
-	var usernameVar, apikeyVar, urlVar, repoVar, repoTypeVar, remoteURLVar string
+	var usernameVar, apikeyVar, urlVar, repoVar, remoteURLVar string
 	var resetVar, valuesVar, debugVar bool
 	flag.IntVar(&workersVar, "workers", 50, "Number of workers")
 	flag.StringVar(&usernameVar, "user", "", "Username")
@@ -58,7 +58,6 @@ func main() {
 	flag.BoolVar(&valuesVar, "values", false, "Output values")
 	flag.StringVar(&remoteURLVar, "remote", "", "Override remote URL")
 	flag.BoolVar(&debugVar, "debug", false, "debug print statements")
-	flag.StringVar(&repoTypeVar, "pkg", "", "Package type")
 	flag.Parse()
 
 	if usernameVar == "" {
@@ -68,8 +67,8 @@ func main() {
 		apikeyVar = creds.Apikey
 	}
 
-	if (repoTypeVar == "" || repoVar == "") && resetVar != true && valuesVar != true {
-		log.Println("Must specify -pkg and -repo")
+	if (repoVar == "") && resetVar != true && valuesVar != true {
+		log.Println("Must specify -repo <Repository>")
 		flag.PrintDefaults()
 		os.Exit(0)
 	}
@@ -105,13 +104,12 @@ func main() {
 	creds.Apikey = apikeyVar
 	creds.URL = urlVar
 
-	checkTypeAndRepoParams(creds, repoVar)
-
-	pkgRepoDlFolder := repoTypeVar + "Downloads"
+	var repotype = checkTypeAndRepoParams(creds, repoVar)
+	pkgRepoDlFolder := repotype + "Downloads"
 
 	//case switch for different package types
 	workQueue := list.New()
-	switch repoTypeVar {
+	switch repotype {
 	case "debian":
 		url := "http://archive.ubuntu.com/ubuntu"
 		go func() {
@@ -150,7 +148,8 @@ func main() {
 		}()
 
 	default:
-		log.Println("Unsupported package type", repoTypeVar, ". We currently support the following:", supportedTypes)
+		log.Println("Unsupported package type", repotype, ". We currently support the following:", supportedTypes)
+		os.Exit(0)
 	}
 
 	//work queue
@@ -164,7 +163,7 @@ func main() {
 					wg.Done()
 					return
 				}
-				switch repoTypeVar {
+				switch repotype {
 				case "debian":
 					md := s.(debian.Metadata)
 					standardDownload(creds, md.URL, md.File, configPath, pkgRepoDlFolder, repoVar)
@@ -191,7 +190,7 @@ func main() {
 	}
 	for {
 		for workQueue.Len() == 0 {
-			log.Println(repoTypeVar, "work queue is empty, sleeping for 5 seconds...")
+			log.Println(repotype, "work queue is empty, sleeping for 5 seconds...")
 			time.Sleep(5 * time.Second)
 		}
 		s := workQueue.Front().Value
@@ -217,7 +216,7 @@ func standardDownload(creds auth.Creds, dlURL string, file string, configPath st
 }
 
 //Test if remote repository exists and is a remote
-func checkTypeAndRepoParams(creds auth.Creds, repoVar string) {
+func checkTypeAndRepoParams(creds auth.Creds, repoVar string) string {
 	repoCheckData, repoStatusCode := auth.GetRestAPI("GET", true, creds.URL+"/api/repositories/"+repoVar, creds.Username, creds.Apikey, "")
 	if repoStatusCode != 200 {
 		log.Println("Repo", repoVar, "does not exist.")
@@ -229,4 +228,5 @@ func checkTypeAndRepoParams(creds auth.Creds, repoVar string) {
 		log.Println(repoVar, "is a", result["rclass"], "repository and not a remote repository.")
 		os.Exit(0)
 	}
+	return result["packageType"].(string)
 }
