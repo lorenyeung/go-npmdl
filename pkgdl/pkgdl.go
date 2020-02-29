@@ -4,6 +4,7 @@ import (
 	"container/list"
 	"encoding/json"
 	"flag"
+	"fmt"
 	"go-pkgdl/auth"
 	"go-pkgdl/debian"
 	"go-pkgdl/docker"
@@ -47,13 +48,14 @@ func main() {
 
 	var workersVar int
 	var usernameVar, apikeyVar, urlVar, repoVar, repoTypeVar string
-	var resetVar bool
+	var resetVar, valuesVar bool
 	flag.IntVar(&workersVar, "workers", 50, "Number of workers")
 	flag.StringVar(&usernameVar, "user", "", "Username")
 	flag.StringVar(&apikeyVar, "apikey", "", "API key")
 	flag.StringVar(&urlVar, "url", creds.URL, "URL")
 	flag.StringVar(&repoVar, "repo", "", "Download Repository")
 	flag.BoolVar(&resetVar, "reset", false, "Reset creds file")
+	flag.BoolVar(&valuesVar, "values", false, "Output values")
 	flag.StringVar(&repoTypeVar, "pkg", "", "Package type")
 	flag.Parse()
 
@@ -64,8 +66,13 @@ func main() {
 		apikeyVar = creds.Apikey
 	}
 
-	if (repoTypeVar == "" || repoVar == "") && resetVar != true {
+	if (repoTypeVar == "" || repoVar == "") && resetVar != true && valuesVar != true {
 		log.Println("Must specify -pkg and -repo")
+		flag.PrintDefaults()
+		os.Exit(0)
+	}
+	if valuesVar == true {
+		fmt.Println("User: ", creds.Username, "\nURL: ", creds.URL, "\nDownload location: ", creds.DlLocation)
 		os.Exit(0)
 	}
 
@@ -76,6 +83,7 @@ func main() {
 		urlVar = creds.URL
 		repoVar = creds.Repository
 	}
+
 	if !auth.VerifyAPIKey(urlVar, usernameVar, apikeyVar) {
 		if creds.Username == usernameVar && creds.Apikey == apikeyVar && creds.URL == urlVar {
 			log.Println("Looks like there's an issue with your credentials file. Resetting")
