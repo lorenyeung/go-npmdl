@@ -10,7 +10,7 @@ import (
 	"golang.org/x/net/html"
 )
 
-//Metadata struct of debian metadata object
+//Metadata struct of Debian metadata object
 type Metadata struct {
 	URL          string
 	Component    string
@@ -19,7 +19,7 @@ type Metadata struct {
 	File         string
 }
 
-//GetDebianHrefs parse hrefs for debian files
+//GetDebianHrefs parse hrefs for Debian files
 func GetDebianHrefs(url string, base string, index int, component string, debianWorkerQueue *list.List) string {
 	resp, err := http.Get(url)
 	// this needs to be threaded better..

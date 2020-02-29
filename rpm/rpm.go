@@ -10,13 +10,13 @@ import (
 	"golang.org/x/net/html"
 )
 
-//Metadata struct of debian metadata object
+//Metadata struct of RPM metadata object
 type Metadata struct {
 	URL  string
 	File string
 }
 
-//GetRpmHrefs parse hrefs for Maven files
+//GetRpmHrefs parse hrefs for RPM files
 func GetRpmHrefs(url string, base string, RpmWorkerQueue *list.List) string {
 	resp, err := http.Get(url)
 	// this needs to be threaded better..

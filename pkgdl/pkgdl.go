@@ -6,6 +6,7 @@ import (
 	"flag"
 	"go-pkgdl/auth"
 	"go-pkgdl/debian"
+	"go-pkgdl/docker"
 	"go-pkgdl/helpers"
 	"go-pkgdl/maven"
 	"go-pkgdl/npm"
@@ -21,7 +22,7 @@ import (
 
 func main() {
 
-	supportedTypes := [5]string{"debian", "maven", "npm", "pypi", "rpm"}
+	supportedTypes := [6]string{"debian", "docker", "maven", "npm", "pypi", "rpm"}
 	usr, err := user.Current()
 	if err != nil {
 		log.Fatal(err)
@@ -111,11 +112,18 @@ func main() {
 			debian.GetDebianHrefs(url+"/pool/", url, 1, "", workQueue)
 		}()
 
+	case "docker":
+		url := "https://registry-1.docker.io"
+		go func() {
+			docker.GetDockerImages(url+"/pool/", url, 1, "", workQueue)
+		}()
+
 	case "maven":
 		url := "https://jcenter.bintray.com"
 		go func() {
 			maven.GetMavenHrefs(url+"/", url, workQueue)
 		}()
+
 	case "npm":
 		npm.GetNPMList(configPath, workQueue)
 
@@ -152,7 +160,7 @@ func main() {
 				case "debian":
 					md := s.(debian.Metadata)
 					standardDownload(creds, md.URL, md.File, configPath, pkgRepoDlFolder)
-					auth.GetRestAPI("PUT", false, creds.URL+"/api/storage/"+creds.Repository+"-cache"+md.URL+"?properties=deb.component="+md.Component+";deb.architecture="+md.Architecture+";deb.distribution="+md.Distribution, creds.Username, creds.Apikey, "")
+					auth.GetRestAPI("PUT", true, creds.URL+"/api/storage/"+creds.Repository+"-cache"+md.URL+"?properties=deb.component="+md.Component+";deb.architecture="+md.Architecture+";deb.distribution="+md.Distribution, creds.Username, creds.Apikey, "")
 
 				case "maven":
 					md := s.(maven.Metadata)

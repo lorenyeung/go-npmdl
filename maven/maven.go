@@ -10,7 +10,7 @@ import (
 	"golang.org/x/net/html"
 )
 
-//Metadata struct of debian metadata object
+//Metadata struct of Maven metadata object
 type Metadata struct {
 	URL  string
 	File string

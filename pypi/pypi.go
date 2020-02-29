@@ -10,13 +10,13 @@ import (
 	"golang.org/x/net/html"
 )
 
-//Metadata struct of debian metadata object
+//Metadata struct of PyPi metadata object
 type Metadata struct {
 	URL  string
 	File string
 }
 
-//GetPypiHrefs parse hrefs for debian files
+//GetPypiHrefs parse PyPi for debian files
 func GetPypiHrefs(registry string, registryBase string, url string, pypiWorkerQueue *list.List) string {
 	resp, err := http.Get(registry)
 	helpers.Check(err, true, "HTTP GET error")
