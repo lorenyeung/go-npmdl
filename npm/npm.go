@@ -47,7 +47,8 @@ func GetNPMMetadata(creds auth.Creds, URL, packageIndex, packageName, configPath
 
 		//TODO can be a problem if you set override base url and the tarball URL no longer matches correctly with creds.URL due to overwrite-base-url header
 		s := strings.Split(j.Dist.Tarball, URL)
-		if s[1] != "" {
+		fmt.Println(len(s), "length of s")
+		if len(s) > 1 && s[1] != "" {
 			_, headStatusCode := auth.GetRestAPI("HEAD", true, creds.URL+"/"+creds.Repository+"-cache/"+s[1], creds.Username, creds.Apikey, "")
 			if headStatusCode == 200 {
 				log.Printf("skipping, got 200 on HEAD request for %s\n", creds.URL+"/"+creds.Repository+"-cache/"+s[1])
