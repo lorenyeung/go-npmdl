@@ -1,7 +1,7 @@
 # pkgdl go script
 
 ## Purpose
-Download a bunch of packages and cache them in an Artifactory remote repository
+Download a bunch of packages and cache them in an Binary Manager's remote repository
 
 ## Installation
 Find your go home (`go env`) 

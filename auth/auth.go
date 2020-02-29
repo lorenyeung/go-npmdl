@@ -48,7 +48,7 @@ func GenerateDownloadJSON(configPath string, regen bool, masterKey string) Creds
 	if regen {
 		creds = GetDownloadJSON(configPath, masterKey)
 	}
-	var urlInput, userName, apiKey, repoInput string
+	var urlInput, userName, apiKey string
 	reader := bufio.NewReader(os.Stdin)
 	for {
 		fmt.Printf("Enter your url [%s]: ", creds.URL)
@@ -82,32 +82,15 @@ func GenerateDownloadJSON(configPath string, regen bool, masterKey string) Creds
 		}
 	}
 	dlLocationInput := configPath
-
-	for {
-		//TODO need to check if repo exists. trim trailing /
-		fmt.Printf("Enter your repository [%s]: ", creds.Repository)
-		repoInput, _ = reader.ReadString('\n')
-		repoInput = strings.TrimSuffix(repoInput, "\n")
-		if repoInput == "" {
-			repoInput = creds.Repository
-		}
-		_, headStatusCode := GetRestAPI("HEAD", true, urlInput+"/"+repoInput+"/", userName, apiKey, "")
-		if headStatusCode != 200 {
-			fmt.Println("Repo does not exist or your user does not have permissions. Try again.")
-			continue
-		}
-		break
-	}
-	return writeFileDownloadJSON(configPath, urlInput, userName, apiKey, dlLocationInput, repoInput, masterKey)
+	return writeFileDownloadJSON(configPath, urlInput, userName, apiKey, dlLocationInput, masterKey)
 }
 
-func writeFileDownloadJSON(configPath, urlInput, userName, apiKey, dlLocationInput, repoInput, masterKey string) Creds {
+func writeFileDownloadJSON(configPath, urlInput, userName, apiKey, dlLocationInput, masterKey string) Creds {
 	data := Creds{
 		URL:        Encrypt(urlInput, masterKey),
 		Username:   Encrypt(userName, masterKey),
 		Apikey:     Encrypt(apiKey, masterKey),
 		DlLocation: Encrypt(dlLocationInput, masterKey),
-		Repository: Encrypt(repoInput, masterKey),
 	}
 	//should probably encrypt data here
 	fileData, err := json.Marshal(data)
@@ -120,7 +103,6 @@ func writeFileDownloadJSON(configPath, urlInput, userName, apiKey, dlLocationInp
 		Username:   userName,
 		Apikey:     apiKey,
 		DlLocation: dlLocationInput,
-		Repository: repoInput,
 	}
 
 	return data2
@@ -143,7 +125,6 @@ func GetDownloadJSON(fileLocation string, masterKey string) Creds {
 		resultData.Username = Decrypt(result["Username"].(string), masterKey)
 		resultData.Apikey = Decrypt(result["Apikey"].(string), masterKey)
 		resultData.DlLocation = Decrypt(result["DlLocation"].(string), masterKey)
-		resultData.Repository = Decrypt(result["Repository"].(string), masterKey)
 	}
 	return resultData
 }

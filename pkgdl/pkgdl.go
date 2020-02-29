@@ -47,8 +47,8 @@ func main() {
 	creds := auth.GetDownloadJSON(configPath+"download.json", masterKey)
 
 	var workersVar int
-	var usernameVar, apikeyVar, urlVar, repoVar, repoTypeVar string
-	var resetVar, valuesVar bool
+	var usernameVar, apikeyVar, urlVar, repoVar, repoTypeVar, remoteURLVar string
+	var resetVar, valuesVar, debugVar bool
 	flag.IntVar(&workersVar, "workers", 50, "Number of workers")
 	flag.StringVar(&usernameVar, "user", "", "Username")
 	flag.StringVar(&apikeyVar, "apikey", "", "API key")
@@ -56,6 +56,8 @@ func main() {
 	flag.StringVar(&repoVar, "repo", "", "Download Repository")
 	flag.BoolVar(&resetVar, "reset", false, "Reset creds file")
 	flag.BoolVar(&valuesVar, "values", false, "Output values")
+	flag.StringVar(&remoteURLVar, "remote", "", "Override remote URL")
+	flag.BoolVar(&debugVar, "debug", false, "debug print statements")
 	flag.StringVar(&repoTypeVar, "pkg", "", "Package type")
 	flag.Parse()
 
@@ -81,7 +83,6 @@ func main() {
 		usernameVar = creds.Username
 		apikeyVar = creds.Apikey
 		urlVar = creds.URL
-		repoVar = creds.Repository
 	}
 
 	if !auth.VerifyAPIKey(urlVar, usernameVar, apikeyVar) {
@@ -92,7 +93,6 @@ func main() {
 			usernameVar = creds.Username
 			apikeyVar = creds.Apikey
 			urlVar = creds.URL
-			repoVar = creds.Repository
 
 		} else {
 			log.Println("Looks like there's an issue with your custom credentials. Exiting")
@@ -104,9 +104,8 @@ func main() {
 	creds.Username = usernameVar
 	creds.Apikey = apikeyVar
 	creds.URL = urlVar
-	creds.Repository = repoVar
 
-	checkTypeAndRepoParams(creds)
+	checkTypeAndRepoParams(creds, repoVar)
 
 	pkgRepoDlFolder := repoTypeVar + "Downloads"
 
@@ -127,7 +126,8 @@ func main() {
 		}()
 
 	case "maven":
-		url := "https://jcenter.bintray.com"
+		//jcenter blocked top level browsing
+		url := "https://repo1.maven.org/maven2"
 		go func() {
 			maven.GetMavenHrefs(url+"/", url, workQueue)
 		}()
@@ -167,24 +167,24 @@ func main() {
 				switch repoTypeVar {
 				case "debian":
 					md := s.(debian.Metadata)
-					standardDownload(creds, md.URL, md.File, configPath, pkgRepoDlFolder)
-					auth.GetRestAPI("PUT", true, creds.URL+"/api/storage/"+creds.Repository+"-cache"+md.URL+"?properties=deb.component="+md.Component+";deb.architecture="+md.Architecture+";deb.distribution="+md.Distribution, creds.Username, creds.Apikey, "")
+					standardDownload(creds, md.URL, md.File, configPath, pkgRepoDlFolder, repoVar)
+					auth.GetRestAPI("PUT", true, creds.URL+"/api/storage/"+repoVar+"-cache"+md.URL+"?properties=deb.component="+md.Component+";deb.architecture="+md.Architecture+";deb.distribution="+md.Distribution, creds.Username, creds.Apikey, "")
 
 				case "maven":
 					md := s.(maven.Metadata)
-					standardDownload(creds, md.URL, md.File, configPath, pkgRepoDlFolder)
+					standardDownload(creds, md.URL, md.File, configPath, pkgRepoDlFolder, repoVar)
 
 				case "npm":
 					md := s.(npm.Metadata)
-					npm.GetNPMMetadata(creds, creds.URL+"/api/npm/"+creds.Repository+"/", md.ID, md.Package, configPath, pkgRepoDlFolder)
+					npm.GetNPMMetadata(creds, creds.URL+"/api/npm/"+repoVar+"/", md.ID, md.Package, configPath, pkgRepoDlFolder)
 
 				case "pypi":
 					md := s.(pypi.Metadata)
-					standardDownload(creds, md.URL, md.File, configPath, pkgRepoDlFolder)
+					standardDownload(creds, md.URL, md.File, configPath, pkgRepoDlFolder, repoVar)
 
 				case "rpm":
 					md := s.(rpm.Metadata)
-					standardDownload(creds, md.URL, md.File, configPath, pkgRepoDlFolder)
+					standardDownload(creds, md.URL, md.File, configPath, pkgRepoDlFolder, repoVar)
 				}
 			}
 		}(i)
@@ -203,30 +203,30 @@ func main() {
 
 }
 
-func standardDownload(creds auth.Creds, dlURL string, file string, configPath string, pkgRepoDlFolder string) {
-	_, headStatusCode := auth.GetRestAPI("HEAD", true, creds.URL+"/"+creds.Repository+"-cache/"+dlURL, creds.Username, creds.Apikey, "")
+func standardDownload(creds auth.Creds, dlURL string, file string, configPath string, pkgRepoDlFolder string, repoVar string) {
+	_, headStatusCode := auth.GetRestAPI("HEAD", true, creds.URL+"/"+repoVar+"-cache/"+dlURL, creds.Username, creds.Apikey, "")
 	if headStatusCode == 200 {
-		log.Printf("skipping, got 200 on HEAD request for %s\n", creds.URL+"/"+creds.Repository+"-cache/"+dlURL)
+		log.Printf("skipping, got 200 on HEAD request for %s\n", creds.URL+"/"+repoVar+"-cache/"+dlURL)
 		return
 	}
 
-	log.Println("Downloading", creds.URL+"/"+creds.Repository+dlURL)
-	auth.GetRestAPI("GET", false, creds.URL+"/"+creds.Repository+dlURL, creds.Username, creds.Apikey, configPath+pkgRepoDlFolder+"/"+file)
+	log.Println("Downloading", creds.URL+"/"+repoVar+dlURL)
+	auth.GetRestAPI("GET", true, creds.URL+"/"+repoVar+dlURL, creds.Username, creds.Apikey, configPath+pkgRepoDlFolder+"/"+file)
 	os.Remove(configPath + pkgRepoDlFolder + "/" + file)
 
 }
 
 //Test if remote repository exists and is a remote
-func checkTypeAndRepoParams(creds auth.Creds) {
-	repoCheckData, repoStatusCode := auth.GetRestAPI("GET", true, creds.URL+"/api/repositories/"+creds.Repository, creds.Username, creds.Apikey, "")
+func checkTypeAndRepoParams(creds auth.Creds, repoVar string) {
+	repoCheckData, repoStatusCode := auth.GetRestAPI("GET", true, creds.URL+"/api/repositories/"+repoVar, creds.Username, creds.Apikey, "")
 	if repoStatusCode != 200 {
-		log.Println("Repo", creds.Repository, "does not exist.")
+		log.Println("Repo", repoVar, "does not exist.")
 		os.Exit(0)
 	}
 	var result map[string]interface{}
 	json.Unmarshal([]byte(repoCheckData), &result)
 	if result["rclass"] != "remote" {
-		log.Println(creds.Repository, "is a", result["rclass"], "repository and not a remote repository.")
+		log.Println(repoVar, "is a", result["rclass"], "repository and not a remote repository.")
 		os.Exit(0)
 	}
 }

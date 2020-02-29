@@ -23,8 +23,11 @@ func GetMavenHrefs(url string, base string, MavenWorkerQueue *list.List) string 
 	helpers.Check(err, false, "HTTP GET error")
 	defer resp.Body.Close()
 
+	//fmt.Println(resp) //output from HTML download
+
 	z := html.NewTokenizer(resp.Body)
 	for {
+
 		tt := z.Next()
 
 		switch {
