@@ -17,7 +17,7 @@ type Metadata struct {
 }
 
 //GetPypiHrefs parse PyPi for debian files
-func GetPypiHrefs(registry string, registryBase string, url string, pypiWorkerQueue *list.List) string {
+func GetPypiHrefs(registry string, registryBase string, url string, pypiWorkerQueue *list.List, debug bool) string {
 	resp, err := http.Get(registry)
 	helpers.Check(err, true, "HTTP GET error")
 	defer resp.Body.Close()
@@ -39,7 +39,7 @@ func GetPypiHrefs(registry string, registryBase string, url string, pypiWorkerQu
 				// recursive look
 				for _, a := range t.Attr {
 					if a.Key == "href" && (strings.HasSuffix(a.Val, "/")) {
-						GetPypiHrefs(registryBase+a.Val, registryBase, url, pypiWorkerQueue)
+						GetPypiHrefs(registryBase+a.Val, registryBase, url, pypiWorkerQueue, debug)
 						break
 					}
 				}

@@ -134,7 +134,7 @@ func main() {
 		}()
 
 	case "npm":
-		npm.GetNPMList(configPath, workQueue)
+		npm.GetNPMList(configPath, workQueue, debugVar)
 
 	case "pypi":
 		go func() {
