@@ -67,7 +67,7 @@ func GetNPMMetadata(creds auth.Creds, URL, packageIndex, packageName, configPath
 }
 
 //GetNPMList function to convert raw list into readable text file
-func GetNPMList(configPath string, npmWorkQueue *list.List) {
+func GetNPMList(configPath string, npmWorkQueue *list.List, debug bool) {
 	if _, err := os.Stat(configPath + "all-npm.json"); os.IsNotExist(err) {
 		log.Println("No all-npm.json found, creating...")
 		auth.GetRestAPI("GET", false, "https://replicate.npmjs.com/_all_docs", "", "", configPath+"all-npm.json")

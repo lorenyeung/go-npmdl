@@ -176,7 +176,7 @@ func main() {
 
 				case "npm":
 					md := s.(npm.Metadata)
-					npm.GetNPMMetadata(creds, creds.URL+"/api/npm/"+repoVar+"/", md.ID, md.Package, configPath, pkgRepoDlFolder)
+					npm.GetNPMMetadata(creds, creds.URL+"/api/npm/"+repoVar+"/", md.ID, md.Package, configPath, pkgRepoDlFolder, debugVar)
 
 				case "pypi":
 					md := s.(pypi.Metadata)
