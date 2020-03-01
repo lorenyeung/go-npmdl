@@ -1,30 +1,32 @@
-package maven
+package generic
 
 import (
 	"container/list"
 	"fmt"
 	"go-pkgdl/helpers"
+	"log"
 	"net/http"
 	"strings"
 
 	"golang.org/x/net/html"
 )
 
-//Metadata struct of Maven metadata object
+//Metadata struct of Generic object
 type Metadata struct {
 	URL  string
 	File string
 }
 
-//GetMavenHrefs parse hrefs for Maven files
-func GetMavenHrefs(url string, base string, MavenWorkerQueue *list.List, debug bool) string {
+//GetGenericHrefs parse hrefs for Generic files
+func GetGenericHrefs(url string, base string, GenericWorkerQueue *list.List, debug bool) string {
 	resp, err := http.Get(url)
 	// this needs to be threaded better..
 	helpers.Check(err, false, "HTTP GET error")
 	defer resp.Body.Close()
 
-	//fmt.Println(resp) //output from HTML download
-
+	if debug {
+		log.Println(resp) //output from HTML download
+	}
 	z := html.NewTokenizer(resp.Body)
 	for {
 
@@ -44,17 +46,17 @@ func GetMavenHrefs(url string, base string, MavenWorkerQueue *list.List, debug b
 					if a.Key == "href" && (strings.HasSuffix(a.Val, "/")) {
 
 						strip := strings.TrimPrefix(a.Val, ":")
-						GetMavenHrefs(url+strip, base, MavenWorkerQueue, debug)
+						GetGenericHrefs(url+strip, base, GenericWorkerQueue, debug)
 						break
 					}
 				}
-				checkMaven(t, url, base, MavenWorkerQueue)
+				checkGeneric(t, url, base, GenericWorkerQueue)
 			}
 		}
 	}
 }
 
-func checkMaven(t html.Token, url string, base string, MavenWorkerQueue *list.List) {
+func checkGeneric(t html.Token, url string, base string, GenericWorkerQueue *list.List) {
 	//need to consider downloading pom.xml too
 	if strings.Contains(t.String(), ".jar") || strings.Contains(t.String(), ".pom") {
 		for _, a := range t.Attr {
@@ -62,13 +64,13 @@ func checkMaven(t html.Token, url string, base string, MavenWorkerQueue *list.Li
 				hrefraw := url + a.Val
 				href := strings.TrimPrefix(hrefraw, base)
 
-				fmt.Println("queuing download", href, a.Val, MavenWorkerQueue.Len())
+				fmt.Println("queuing download", href, a.Val, GenericWorkerQueue.Len())
 
 				//add Maven metadata to queue
 				var MavenMd Metadata
 				MavenMd.URL = strings.Replace(href, ":", "", -1)
 				MavenMd.File = strings.TrimPrefix(a.Val, ":")
-				MavenWorkerQueue.PushBack(MavenMd)
+				GenericWorkerQueue.PushBack(MavenMd)
 				break
 			}
 		}

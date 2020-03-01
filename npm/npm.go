@@ -35,7 +35,7 @@ type Metadata struct {
 }
 
 //GetNPMMetadata blah
-func GetNPMMetadata(creds auth.Creds, URL, packageIndex, packageName, configPath string, dlFolder string) {
+func GetNPMMetadata(creds auth.Creds, URL, packageIndex, packageName, configPath string, dlFolder string, debug bool) {
 	data, _ := auth.GetRestAPI("GET", true, URL+packageName, creds.Username, creds.Apikey, "")
 	var metadata = artifactMetadata{}
 	err := json.Unmarshal([]byte(data), &metadata)

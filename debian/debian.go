@@ -4,6 +4,7 @@ import (
 	"container/list"
 	"fmt"
 	"go-pkgdl/helpers"
+	"log"
 	"net/http"
 	"strings"
 
@@ -20,12 +21,14 @@ type Metadata struct {
 }
 
 //GetDebianHrefs parse hrefs for Debian files
-func GetDebianHrefs(url string, base string, index int, component string, debianWorkerQueue *list.List) string {
+func GetDebianHrefs(url string, base string, index int, component string, debianWorkerQueue *list.List, debug bool) string {
 	resp, err := http.Get(url)
 	// this needs to be threaded better..
 	helpers.Check(err, false, "HTTP GET error")
 	defer resp.Body.Close()
-
+	if debug {
+		log.Println(resp) //output from HTML download
+	}
 	z := html.NewTokenizer(resp.Body)
 	for {
 		tt := z.Next()
@@ -47,7 +50,7 @@ func GetDebianHrefs(url string, base string, index int, component string, debian
 						if index == 1 {
 							component = strings.TrimSuffix(a.Val, "/")
 						}
-						GetDebianHrefs(url+a.Val, base, index+1, component, debianWorkerQueue)
+						GetDebianHrefs(url+a.Val, base, index+1, component, debianWorkerQueue, debug)
 						break
 					}
 				}

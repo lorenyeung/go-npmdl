@@ -4,6 +4,7 @@ import (
 	"container/list"
 	"fmt"
 	"go-pkgdl/helpers"
+	"log"
 	"net/http"
 	"strings"
 
@@ -17,12 +18,14 @@ type Metadata struct {
 }
 
 //GetRpmHrefs parse hrefs for RPM files
-func GetRpmHrefs(url string, base string, RpmWorkerQueue *list.List) string {
+func GetRpmHrefs(url string, base string, RpmWorkerQueue *list.List, debug bool) string {
 	resp, err := http.Get(url)
 	// this needs to be threaded better..
 	helpers.Check(err, false, "HTTP GET error")
 	defer resp.Body.Close()
-
+	if debug {
+		log.Println(resp) //output from HTML download
+	}
 	z := html.NewTokenizer(resp.Body)
 	for {
 		tt := z.Next()
@@ -37,8 +40,10 @@ func GetRpmHrefs(url string, base string, RpmWorkerQueue *list.List) string {
 				// recursive look
 				for _, a := range t.Attr {
 					if a.Key == "href" && (strings.HasSuffix(a.Val, "/")) && a.Val != "/" && !strings.Contains(a.Val, "://") && a.Val != "centos/" {
-						fmt.Println("for", url+a.Val)
-						GetRpmHrefs(url+a.Val, base, RpmWorkerQueue)
+						if debug {
+							fmt.Println("for", url+a.Val)
+						}
+						GetRpmHrefs(url+a.Val, base, RpmWorkerQueue, debug)
 						break
 					}
 				}

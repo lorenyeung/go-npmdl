@@ -10,7 +10,7 @@ import (
 )
 
 //GetDockerImages Docker Engine API search
-func GetDockerImages(url string, base string, index int, component string, dockerWorkerQueue *list.List) string {
+func GetDockerImages(url string, base string, index int, component string, dockerWorkerQueue *list.List, debug bool) string {
 
 	//https://github.com/moby/moby/blob/master/client/image_search.go#L17
 

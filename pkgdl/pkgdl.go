@@ -8,22 +8,23 @@ import (
 	"go-pkgdl/auth"
 	"go-pkgdl/debian"
 	"go-pkgdl/docker"
+	"go-pkgdl/generic"
 	"go-pkgdl/helpers"
 	"go-pkgdl/maven"
 	"go-pkgdl/npm"
 	"go-pkgdl/pypi"
 	"go-pkgdl/rpm"
-
 	"log"
 	"os"
 	"os/user"
+	"strings"
 	"sync"
 	"time"
 )
 
 func main() {
 
-	supportedTypes := [6]string{"debian", "docker", "maven", "npm", "pypi", "rpm"}
+	supportedTypes := [7]string{"debian", "docker", "generic", "maven", "npm", "pypi", "rpm"}
 	usr, err := user.Current()
 	if err != nil {
 		log.Fatal(err)
@@ -47,7 +48,7 @@ func main() {
 	creds := auth.GetDownloadJSON(configPath+"download.json", masterKey)
 
 	var workersVar int
-	var usernameVar, apikeyVar, urlVar, repoVar, remoteURLVar string
+	var usernameVar, apikeyVar, urlVar, repoVar string
 	var resetVar, valuesVar, debugVar bool
 	flag.IntVar(&workersVar, "workers", 50, "Number of workers")
 	flag.StringVar(&usernameVar, "user", "", "Username")
@@ -56,7 +57,6 @@ func main() {
 	flag.StringVar(&repoVar, "repo", "", "Download Repository")
 	flag.BoolVar(&resetVar, "reset", false, "Reset creds file")
 	flag.BoolVar(&valuesVar, "values", false, "Output values")
-	flag.StringVar(&remoteURLVar, "remote", "", "Override remote URL")
 	flag.BoolVar(&debugVar, "debug", false, "debug print statements")
 	flag.Parse()
 
@@ -104,30 +104,33 @@ func main() {
 	creds.Apikey = apikeyVar
 	creds.URL = urlVar
 
-	var repotype = checkTypeAndRepoParams(creds, repoVar)
+	var repotype, extractedURL, pypiRegistryURL, pypiRepoSuffix = checkTypeAndRepoParams(creds, repoVar)
 	pkgRepoDlFolder := repotype + "Downloads"
 
 	//case switch for different package types
 	workQueue := list.New()
+	var extractedURLStripped = strings.TrimSuffix(extractedURL, "/")
 	switch repotype {
 	case "debian":
-		url := "http://archive.ubuntu.com/ubuntu"
 		go func() {
-			//func GetDebianHrefs(url string, base string, index int, component string, debianWorkerQueue *list.List) string {
-			debian.GetDebianHrefs(url+"/pool/", url, 1, "", workQueue)
+			debian.GetDebianHrefs(extractedURL+"pool/", extractedURLStripped, 1, "", workQueue, debugVar)
 		}()
 
 	case "docker":
-		url := "https://registry-1.docker.io"
+		fmt.Println("Work in progress")
 		go func() {
-			docker.GetDockerImages(url+"/pool/", url, 1, "", workQueue)
+			docker.GetDockerImages(extractedURL, extractedURLStripped, 1, "", workQueue, debugVar)
+		}()
+
+	case "generic":
+		fmt.Println("Work in progress")
+		go func() {
+			generic.GetGenericHrefs(extractedURL, extractedURLStripped, workQueue, debugVar)
 		}()
 
 	case "maven":
-		//jcenter blocked top level browsing
-		url := "https://repo1.maven.org/maven2"
 		go func() {
-			maven.GetMavenHrefs(url+"/", url, workQueue)
+			maven.GetMavenHrefs(extractedURL, extractedURLStripped, workQueue, debugVar)
 		}()
 
 	case "npm":
@@ -135,16 +138,14 @@ func main() {
 
 	case "pypi":
 		go func() {
-			registry := "https://pypi.org"
-			url := "https://files.pythonhosted.org"
-			pypi.GetPypiHrefs(registry+"/simple/", registry, url, workQueue)
+			pypi.GetPypiHrefs(pypiRegistryURL+"/"+pypiRepoSuffix+"/", pypiRegistryURL, extractedURLStripped, workQueue, debugVar)
 		}()
 
 	case "rpm":
 		go func() {
 			log.Print("rpm takes 10 seconds to init, please be patient")
-			url := "http://mirror.centos.org"
-			rpm.GetRpmHrefs(url+"/centos/", url, workQueue)
+			//buggy. looks like there is a recursive search that screws it up
+			rpm.GetRpmHrefs(extractedURL, extractedURLStripped, workQueue, debugVar)
 		}()
 
 	default:
@@ -189,9 +190,17 @@ func main() {
 		}(i)
 	}
 	for {
+		var count0 = 0
 		for workQueue.Len() == 0 {
 			log.Println(repotype, "work queue is empty, sleeping for 5 seconds...")
 			time.Sleep(5 * time.Second)
+			count0++
+			if count0 > 10 {
+				log.Println("Looks like nothing's getting put into the workqueue. You might want to enable -debug and take a look")
+			}
+			if workQueue.Len() > 0 {
+				count0 = 0
+			}
 		}
 		s := workQueue.Front().Value
 		workQueue.Remove(workQueue.Front())
@@ -216,7 +225,7 @@ func standardDownload(creds auth.Creds, dlURL string, file string, configPath st
 }
 
 //Test if remote repository exists and is a remote
-func checkTypeAndRepoParams(creds auth.Creds, repoVar string) string {
+func checkTypeAndRepoParams(creds auth.Creds, repoVar string) (string, string, string, string) {
 	repoCheckData, repoStatusCode := auth.GetRestAPI("GET", true, creds.URL+"/api/repositories/"+repoVar, creds.Username, creds.Apikey, "")
 	if repoStatusCode != 200 {
 		log.Println("Repo", repoVar, "does not exist.")
@@ -228,5 +237,8 @@ func checkTypeAndRepoParams(creds auth.Creds, repoVar string) string {
 		log.Println(repoVar, "is a", result["rclass"], "repository and not a remote repository.")
 		os.Exit(0)
 	}
-	return result["packageType"].(string)
+	if result["packageType"].(string) == "pypi" {
+		return result["packageType"].(string), result["url"].(string), result["pyPIRegistryUrl"].(string), result["pyPIRepositorySuffix"].(string)
+	}
+	return result["packageType"].(string), result["url"].(string), "", ""
 }
