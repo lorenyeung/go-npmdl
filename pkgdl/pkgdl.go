@@ -117,9 +117,9 @@ func main() {
 		}()
 
 	case "docker":
-		fmt.Println("Work in progress")
+		fmt.Println("Work in progress, only works against Docker Hub")
 		go func() {
-			docker.GetDockerImages(extractedURL, extractedURLStripped, 1, "", workQueue, debugVar)
+			docker.GetDockerImages(creds.URL, creds.Username, creds.Apikey, repoVar, extractedURL, extractedURLStripped, 1, "", workQueue, debugVar)
 		}()
 
 	case "generic":
@@ -169,6 +169,10 @@ func main() {
 					md := s.(debian.Metadata)
 					standardDownload(creds, md.URL, md.File, configPath, pkgRepoDlFolder, repoVar)
 					auth.GetRestAPI("PUT", true, creds.URL+"/api/storage/"+repoVar+"-cache"+md.URL+"?properties=deb.component="+md.Component+";deb.architecture="+md.Architecture+";deb.distribution="+md.Distribution, creds.Username, creds.Apikey, "")
+
+				case "docker":
+					md := s.(docker.Metadata)
+					docker.DownloadDockerLayers(creds, md, repoVar, i)
 
 				case "maven":
 					md := s.(maven.Metadata)
