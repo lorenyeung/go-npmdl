@@ -13,10 +13,11 @@ import (
 	"go-pkgdl/helpers"
 	"io"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"os"
 	"strings"
+
+	log "github.com/Sirupsen/logrus"
 
 	"golang.org/x/crypto/ssh/terminal"
 )
@@ -32,13 +33,13 @@ type Creds struct {
 
 // VerifyAPIKey for errors
 func VerifyAPIKey(urlInput, userName, apiKey string) bool {
-	log.Printf("starting VerifyAPIkey request. Testing: %s\n", userName)
-	data, _ := GetRestAPI("GET", true, urlInput+"/api/system/ping", userName, apiKey, "")
+	log.Debug("starting VerifyAPIkey request. Testing:", userName)
+	data, _, _ := GetRestAPI("GET", true, urlInput+"/api/system/ping", userName, apiKey, "", nil)
 	if string(data) == "OK" {
-		log.Printf("finished VerifyAPIkey request. Credentials are good to go.")
+		log.Debug("finished VerifyAPIkey request. Credentials are good to go.")
 		return true
 	}
-	log.Printf("finished VerifyAPIkey request: %s\n", string(data))
+	log.Debug("finished VerifyAPIkey request:", string(data))
 	return false
 }
 
@@ -130,27 +131,32 @@ func GetDownloadJSON(fileLocation string, masterKey string) Creds {
 }
 
 //GetRestAPI GET rest APIs response with error handling
-func GetRestAPI(method string, auth bool, urlInput, userName, apiKey, filepath string) ([]byte, int) {
+func GetRestAPI(method string, auth bool, urlInput, userName, apiKey, filepath string, header map[string]string) ([]byte, int, http.Header) {
 	client := http.Client{}
 	req, err := http.NewRequest(method, urlInput, nil)
 	if auth {
 		req.SetBasicAuth(userName, apiKey)
 	}
+	for x, y := range header {
+		log.Debug("Recieved header:", x+":"+y)
+		req.Header.Set(x, y)
+	}
 	if err != nil {
-		fmt.Printf("The HTTP request failed with error %s\n", err)
+		log.Warn("The HTTP request failed with error %s\n", err)
 	} else {
 
 		resp, err := client.Do(req)
 		helpers.Check(err, false, "The HTTP response")
 
 		if err != nil {
-			return nil, 0
+			return nil, 0, nil
 		}
 		if resp.StatusCode != 200 {
-			log.Printf("Got status code %d for %s, continuing\n", resp.StatusCode, urlInput)
+			log.Debug("Got status code ", resp.StatusCode, " on ", method, " request for ", urlInput, " continuing")
 		}
 		//Mostly for HEAD requests
 		statusCode := resp.StatusCode
+		headers := resp.Header
 
 		if filepath != "" && method == "GET" {
 			// Create the file
@@ -165,10 +171,10 @@ func GetRestAPI(method string, auth bool, urlInput, userName, apiKey, filepath s
 		} else {
 			data, err := ioutil.ReadAll(resp.Body)
 			helpers.Check(err, false, "Data read")
-			return data, statusCode
+			return data, statusCode, headers
 		}
 	}
-	return nil, 0
+	return nil, 0, nil
 }
 
 //CreateHash self explanatory
@@ -217,12 +223,12 @@ func VerifyMasterKey(configPath string) string {
 	_, err := os.Open(configPath)
 	var token string
 	if err != nil {
-		log.Printf("Finding master key failed with error %s\n", err)
+		log.Warn("Finding master key failed with error %s\n", err)
 		data, err := generateRandomBytes(32)
 		helpers.Check(err, true, "Generating new master key")
 		err2 := ioutil.WriteFile(configPath, []byte(base64.URLEncoding.EncodeToString(data)), 0600)
 		helpers.Check(err2, true, "Master key write")
-		log.Println("Successfully generated master key")
+		log.Info("Successfully generated master key")
 		token = base64.URLEncoding.EncodeToString(data)
 	} else {
 		dat, err := ioutil.ReadFile(configPath)

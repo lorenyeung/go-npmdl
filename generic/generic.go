@@ -4,9 +4,10 @@ import (
 	"container/list"
 	"fmt"
 	"go-pkgdl/helpers"
-	"log"
 	"net/http"
 	"strings"
+
+	log "github.com/Sirupsen/logrus"
 
 	"golang.org/x/net/html"
 )
@@ -18,15 +19,14 @@ type Metadata struct {
 }
 
 //GetGenericHrefs parse hrefs for Generic files
-func GetGenericHrefs(url string, base string, GenericWorkerQueue *list.List, debug bool) string {
+func GetGenericHrefs(url string, base string, GenericWorkerQueue *list.List) string {
 	resp, err := http.Get(url)
 	// this needs to be threaded better..
 	helpers.Check(err, false, "HTTP GET error")
 	defer resp.Body.Close()
 
-	if debug {
-		log.Println(resp) //output from HTML download
-	}
+	log.Debug(resp) //output from HTML download
+
 	z := html.NewTokenizer(resp.Body)
 	for {
 
@@ -46,7 +46,7 @@ func GetGenericHrefs(url string, base string, GenericWorkerQueue *list.List, deb
 					if a.Key == "href" && (strings.HasSuffix(a.Val, "/")) {
 
 						strip := strings.TrimPrefix(a.Val, ":")
-						GetGenericHrefs(url+strip, base, GenericWorkerQueue, debug)
+						GetGenericHrefs(url+strip, base, GenericWorkerQueue)
 						break
 					}
 				}

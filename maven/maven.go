@@ -17,7 +17,7 @@ type Metadata struct {
 }
 
 //GetMavenHrefs parse hrefs for Maven files
-func GetMavenHrefs(url string, base string, MavenWorkerQueue *list.List, debug bool) string {
+func GetMavenHrefs(url string, base string, MavenWorkerQueue *list.List) string {
 	resp, err := http.Get(url)
 	// this needs to be threaded better..
 	helpers.Check(err, false, "HTTP GET error")
@@ -44,7 +44,7 @@ func GetMavenHrefs(url string, base string, MavenWorkerQueue *list.List, debug b
 					if a.Key == "href" && (strings.HasSuffix(a.Val, "/")) {
 
 						strip := strings.TrimPrefix(a.Val, ":")
-						GetMavenHrefs(url+strip, base, MavenWorkerQueue, debug)
+						GetMavenHrefs(url+strip, base, MavenWorkerQueue)
 						break
 					}
 				}

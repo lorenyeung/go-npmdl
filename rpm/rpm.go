@@ -4,9 +4,10 @@ import (
 	"container/list"
 	"fmt"
 	"go-pkgdl/helpers"
-	"log"
 	"net/http"
 	"strings"
+
+	log "github.com/Sirupsen/logrus"
 
 	"golang.org/x/net/html"
 )
@@ -18,14 +19,13 @@ type Metadata struct {
 }
 
 //GetRpmHrefs parse hrefs for RPM files
-func GetRpmHrefs(url string, base string, RpmWorkerQueue *list.List, debug bool) string {
+func GetRpmHrefs(url string, base string, RpmWorkerQueue *list.List) string {
 	resp, err := http.Get(url)
 	// this needs to be threaded better..
 	helpers.Check(err, false, "HTTP GET error")
 	defer resp.Body.Close()
-	if debug {
-		log.Println(resp) //output from HTML download
-	}
+	log.Debug(resp) //output from HTML download
+
 	z := html.NewTokenizer(resp.Body)
 	for {
 		tt := z.Next()
@@ -40,10 +40,10 @@ func GetRpmHrefs(url string, base string, RpmWorkerQueue *list.List, debug bool)
 				// recursive look
 				for _, a := range t.Attr {
 					if a.Key == "href" && (strings.HasSuffix(a.Val, "/")) && a.Val != "/" && !strings.Contains(a.Val, "://") && a.Val != "centos/" {
-						if debug {
-							fmt.Println("for", url+a.Val)
-						}
-						GetRpmHrefs(url+a.Val, base, RpmWorkerQueue, debug)
+
+						log.Debug("for", url+a.Val)
+
+						GetRpmHrefs(url+a.Val, base, RpmWorkerQueue)
 						break
 					}
 				}
