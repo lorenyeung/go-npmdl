@@ -16,6 +16,7 @@ import (
 	"go-pkgdl/rpm"
 	"os"
 	"os/user"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -44,10 +45,18 @@ func main() {
 		level = log.InfoLevel
 	}
 	log.SetLevel(level)
+	log.SetReportCaller(true)
 	customFormatter := new(logrus.TextFormatter)
 	customFormatter.TimestampFormat = "2006-01-02 15:04:05"
-	logrus.SetFormatter(customFormatter)
+	customFormatter.QuoteEmptyFields = true
 	customFormatter.FullTimestamp = true
+	customFormatter.CallerPrettyfier = func(f *runtime.Frame) (string, string) {
+		repopath := strings.Split(f.File, "/")
+		function := strings.Replace(f.Function, "go-pkgdl/", "", -1)
+		return fmt.Sprintf("%s\t", function), fmt.Sprintf(" %s:%d\t", repopath[len(repopath)-1], f.Line)
+	}
+
+	logrus.SetFormatter(customFormatter)
 
 	supportedTypes := [7]string{"debian", "docker", "generic", "maven", "npm", "pypi", "rpm"}
 	usr, err := user.Current()
@@ -172,13 +181,17 @@ func main() {
 	var ch = make(chan interface{}, workersVar+1)
 	var wg sync.WaitGroup
 	for i := 0; i < workersVar; i++ {
+		//wg.Add(1)
 		go func(i int) {
 			for {
+
 				s, ok := <-ch
 				if !ok {
+					log.Info("Worker being returned to queue?", i)
 					wg.Done()
-					return
+					//return
 				}
+				log.Debug("worker ", i, " starting job")
 				switch repotype {
 				case "debian":
 					md := s.(debian.Metadata)
@@ -187,7 +200,7 @@ func main() {
 
 				case "docker":
 					md := s.(docker.Metadata)
-					docker.DownloadDockerLayers(creds, md, repoVar, i)
+					docker.DlDockerLayers(creds, md, repoVar, i)
 
 				case "maven":
 					md := s.(maven.Metadata)
@@ -195,7 +208,7 @@ func main() {
 
 				case "npm":
 					md := s.(npm.Metadata)
-					npm.GetNPMMetadata(creds, creds.URL+"/api/npm/"+repoVar+"/", md.ID, md.Package, configPath, pkgRepoDlFolder)
+					npm.GetNPMMetadata(creds, creds.URL+"/api/npm/"+repoVar+"/", md.ID, md.Package, configPath, pkgRepoDlFolder, i)
 
 				case "pypi":
 					md := s.(pypi.Metadata)
@@ -205,8 +218,11 @@ func main() {
 					md := s.(rpm.Metadata)
 					standardDownload(creds, md.URL, md.File, configPath, pkgRepoDlFolder, repoVar)
 				}
+				log.Debug("worker ", i, " finished job")
 			}
+			//wg.Done()
 		}(i)
+
 	}
 	for {
 		var count0 = 0

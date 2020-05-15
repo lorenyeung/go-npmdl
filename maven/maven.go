@@ -2,10 +2,11 @@ package maven
 
 import (
 	"container/list"
-	"fmt"
 	"go-pkgdl/helpers"
 	"net/http"
 	"strings"
+
+	log "github.com/Sirupsen/logrus"
 
 	"golang.org/x/net/html"
 )
@@ -62,7 +63,7 @@ func checkMaven(t html.Token, url string, base string, MavenWorkerQueue *list.Li
 				hrefraw := url + a.Val
 				href := strings.TrimPrefix(hrefraw, base)
 
-				fmt.Println("queuing download", href, a.Val, MavenWorkerQueue.Len())
+				log.Info("queuing download", href, a.Val, MavenWorkerQueue.Len())
 
 				//add Maven metadata to queue
 				var MavenMd Metadata

@@ -3,14 +3,14 @@ package npm
 import (
 	"container/list"
 	"encoding/json"
-	"fmt"
 	"go-pkgdl/auth"
 	"go-pkgdl/helpers"
 	"io/ioutil"
-	"log"
 	"os"
 	"strconv"
 	"strings"
+
+	log "github.com/Sirupsen/logrus"
 )
 
 //Metadata blah
@@ -35,12 +35,12 @@ type Metadata struct {
 }
 
 //GetNPMMetadata blah
-func GetNPMMetadata(creds auth.Creds, URL, packageIndex, packageName, configPath string, dlFolder string) {
+func GetNPMMetadata(creds auth.Creds, URL, packageIndex, packageName, configPath string, dlFolder string, workerNum int) {
 	data, _, _ := auth.GetRestAPI("GET", true, URL+packageName, creds.Username, creds.Apikey, "", nil)
 	var metadata = artifactMetadata{}
 	err := json.Unmarshal([]byte(data), &metadata)
 	if err != nil {
-		fmt.Println("error:" + err.Error())
+		log.Error("Worker ", workerNum, " error:"+err.Error())
 	}
 	for i, j := range metadata.Versions {
 		packageDl := packageIndex + "-" + i + ".tgz"
@@ -51,11 +51,11 @@ func GetNPMMetadata(creds auth.Creds, URL, packageIndex, packageName, configPath
 		if len(s) > 1 && s[1] != "" {
 			_, headStatusCode, _ := auth.GetRestAPI("HEAD", true, creds.URL+"/"+creds.Repository+"-cache/"+s[1], creds.Username, creds.Apikey, "", nil)
 			if headStatusCode == 200 {
-				log.Printf("skipping, got 200 on HEAD request for %s\n", creds.URL+"/"+creds.Repository+"-cache/"+s[1])
+				log.Debug("Worker ", workerNum, " skipping, got 200 on HEAD request for ", creds.URL+"/"+creds.Repository+"-cache/"+s[1])
 				continue
 			}
 		}
-		log.Println(packageIndex, i, j.Dist.Tarball, configPath+dlFolder+"/"+packageDl)
+		log.Info("Worker ", workerNum, " Downloading ", packageIndex, i, j.Dist.Tarball)
 		auth.GetRestAPI("GET", true, j.Dist.Tarball, creds.Username, creds.Apikey, configPath+dlFolder+"/"+packageDl, nil)
 		err2 := os.Remove(configPath + dlFolder + "/" + packageDl)
 		helpers.Check(err2, false, "Deleting file")
@@ -69,7 +69,7 @@ func GetNPMMetadata(creds auth.Creds, URL, packageIndex, packageName, configPath
 //GetNPMList function to convert raw list into readable text file
 func GetNPMList(configPath string, npmWorkQueue *list.List) {
 	if _, err := os.Stat(configPath + "all-npm.json"); os.IsNotExist(err) {
-		log.Println("No all-npm.json found, creating...")
+		log.Info("No all-npm.json found, creating...")
 		auth.GetRestAPI("GET", false, "https://replicate.npmjs.com/_all_docs", "", "", configPath+"all-npm.json", nil)
 	}
 	var result Metadata

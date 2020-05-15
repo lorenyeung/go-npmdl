@@ -105,8 +105,8 @@ func dockerSearch(search string, results []registry.SearchResult, artURL string,
 	}
 }
 
-//DownloadDockerLayers download docker layers
-func DownloadDockerLayers(creds auth.Creds, md Metadata, repo string, workerNum int) {
+//DlDockerLayers download docker layers
+func DlDockerLayers(creds auth.Creds, md Metadata, repo string, workerNum int) {
 	log.Info("Worker ", workerNum, " Getting manifest for first time:", md.ManifestURLAPI)
 	m := map[string]string{
 		"Accept": "application/vnd.docker.distribution.manifest.v2+json",
@@ -117,7 +117,7 @@ func DownloadDockerLayers(creds auth.Creds, md Metadata, repo string, workerNum 
 	var manifestData dockerManifestMetadata
 	err := json.Unmarshal(manifest, &manifestData)
 	if err != nil {
-		fmt.Println("error:" + err.Error())
+		log.Warn("Worker ", workerNum, " error mapping manifest:"+err.Error())
 	}
 	log.Trace("Worker ", workerNum, " Manifest headers:", headers, string(manifest), md.Image, md.Tag)
 	log.Debug("Worker ", workerNum, " Manifest recieved data:", headers, manifestData.Config.Digest, manifestData.Config.MediaType)
@@ -130,12 +130,15 @@ func DownloadDockerLayers(creds auth.Creds, md Metadata, repo string, workerNum 
 	for x := range manifestData.FsLayers {
 		//go func(x int) {
 		//defer wg.Done()
+		if x%10 == 0 && x != 0 {
+			log.Info("Worker ", workerNum, " Downloaded ", x, " layers of image ", md.Image, ":", md.Tag)
+		}
 		headLoc := creds.URL + "/" + repo + "-cache/" + md.Image + "/" + md.Tag + "/" + strings.Replace(manifestData.FsLayers[x].BlobSum, ":", "__", -1)
 		log.Debug("Worker ", workerNum, " Getting blob:", manifestData.FsLayers[x].BlobSum)
 		_, headStatusCode, _ := auth.GetRestAPI("HEAD", true, headLoc, creds.Username, creds.Apikey, "", nil)
 		if headStatusCode == 200 {
 			log.Debug("Worker ", workerNum, " skipping, got 200 on HEAD request for ", manifestData.FsLayers[x].BlobSum)
-			return
+			continue
 		}
 		log.Debug("Worker ", workerNum, " Downloading blob:", manifestData.FsLayers[x].BlobSum)
 		blobDownload := creds.URL + "/api/docker/" + repo + "/v2/" + md.Image + "/blobs/" + manifestData.FsLayers[x].BlobSum

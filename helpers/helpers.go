@@ -2,18 +2,19 @@ package helpers
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"time"
+
+	log "github.com/Sirupsen/logrus"
 )
 
 //Check logger for errors
 func Check(e error, panic bool, logs string) {
 	if e != nil && panic {
-		log.Panicf("%s failed with error:%s\n", logs, e)
+		log.Error(logs, " failed with error:", e)
 	}
 	if e != nil && !panic {
-		log.Printf("%s failed with error:%s\n", logs, e)
+		log.Warn(logs, " failed with error:", e)
 	}
 }
 
@@ -21,7 +22,7 @@ func Check(e error, panic bool, logs string) {
 func PrintDownloadPercent(done chan int64, path string, total int64) {
 	var stop = false
 	if total == -1 {
-		fmt.Println("-1 Content length, can't load download bar, will download silently")
+		log.Warn("-1 Content length, can't load download bar, will download silently")
 		return
 	}
 	for {

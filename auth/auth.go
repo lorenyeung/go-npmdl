@@ -138,11 +138,11 @@ func GetRestAPI(method string, auth bool, urlInput, userName, apiKey, filepath s
 		req.SetBasicAuth(userName, apiKey)
 	}
 	for x, y := range header {
-		log.Debug("Recieved header:", x+":"+y)
+		log.Debug("Recieved extra header:", x+":"+y)
 		req.Header.Set(x, y)
 	}
 	if err != nil {
-		log.Warn("The HTTP request failed with error %s\n", err)
+		log.Warn("The HTTP request failed with error", err)
 	} else {
 
 		resp, err := client.Do(req)
