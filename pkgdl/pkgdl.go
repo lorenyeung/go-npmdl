@@ -29,7 +29,7 @@ func main() {
 
 	var workersVar int
 	var usernameVar, apikeyVar, urlVar, repoVar, logLevelVar string
-	var resetVar, valuesVar bool
+	var resetVar, valuesVar, randomVar bool
 	flag.StringVar(&logLevelVar, "log", "INFO", "Order of Severity: TRACE, DEBUG, INFO, WARN, ERROR, FATAL, PANIC")
 	flag.IntVar(&workersVar, "workers", 50, "Number of workers")
 	flag.StringVar(&usernameVar, "user", "", "Username")
@@ -38,6 +38,7 @@ func main() {
 	flag.StringVar(&repoVar, "repo", "", "Download Repository")
 	flag.BoolVar(&resetVar, "reset", false, "Reset creds file")
 	flag.BoolVar(&valuesVar, "values", false, "Output values")
+	flag.BoolVar(&randomVar, "random", false, "Attempt to pull packages in random queue order")
 	flag.Parse()
 
 	level, err := log.ParseLevel(logLevelVar)
@@ -45,6 +46,7 @@ func main() {
 		level = log.InfoLevel
 	}
 	log.SetLevel(level)
+
 	log.SetReportCaller(true)
 	customFormatter := new(logrus.TextFormatter)
 	customFormatter.TimestampFormat = "2006-01-02 15:04:05"
@@ -57,6 +59,7 @@ func main() {
 	}
 
 	logrus.SetFormatter(customFormatter)
+	log.Info("Log level set at ", level)
 
 	supportedTypes := [7]string{"debian", "docker", "generic", "maven", "npm", "pypi", "rpm"}
 	usr, err := user.Current()
@@ -71,7 +74,7 @@ func main() {
 		if _, err := os.Stat(configPath + supportedTypes[i] + "Downloads/"); os.IsNotExist(err) {
 			log.Info("No config folder found")
 			err = os.MkdirAll(configPath+supportedTypes[i]+"Downloads/", 0700)
-			helpers.Check(err, true, "Generating "+configPath+" directory")
+			helpers.Check(err, true, "Generating "+configPath+" directory", helpers.Trace())
 		} else {
 		}
 	}
@@ -141,13 +144,13 @@ func main() {
 		}()
 
 	case "docker":
-		fmt.Println("Work in progress, only works against Docker Hub")
+		log.Warn("Work in progress, only works against Docker Hub")
 		go func() {
-			docker.GetDockerImages(creds.URL, creds.Username, creds.Apikey, repoVar, extractedURL, extractedURLStripped, 1, "", workQueue)
+			docker.GetDockerImages(creds.URL, creds.Username, creds.Apikey, repoVar, extractedURL, extractedURLStripped, 1, "", workQueue, randomVar)
 		}()
 
 	case "generic":
-		fmt.Println("Work in progress")
+		log.Warn("Work in progress")
 		go func() {
 			generic.GetGenericHrefs(extractedURL, extractedURLStripped, workQueue)
 		}()
