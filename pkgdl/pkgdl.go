@@ -69,7 +69,7 @@ func main() {
 	configFolder := "/.lorenygo/pkgDownloader/"
 	configPath := usr.HomeDir + configFolder
 
-	log.Info("Checking existence of download folders for:", supportedTypes)
+	log.Debug("Checking existence of download folders for:", supportedTypes)
 	for i := 0; i < len(supportedTypes); i++ {
 		if _, err := os.Stat(configPath + supportedTypes[i] + "Downloads/"); os.IsNotExist(err) {
 			log.Info("No config folder found")
