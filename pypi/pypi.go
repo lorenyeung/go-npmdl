@@ -19,7 +19,7 @@ type Metadata struct {
 //GetPypiHrefs parse PyPi for debian files
 func GetPypiHrefs(registry string, registryBase string, url string, pypiWorkerQueue *list.List) string {
 	resp, err := http.Get(registry)
-	helpers.Check(err, true, "HTTP GET error")
+	helpers.Check(err, true, "HTTP GET error", helpers.Trace())
 	defer resp.Body.Close()
 
 	z := html.NewTokenizer(resp.Body)

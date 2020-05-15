@@ -22,7 +22,7 @@ type Metadata struct {
 func GetGenericHrefs(url string, base string, GenericWorkerQueue *list.List) string {
 	resp, err := http.Get(url)
 	// this needs to be threaded better..
-	helpers.Check(err, false, "HTTP GET error")
+	helpers.Check(err, false, "HTTP GET error", helpers.Trace())
 	defer resp.Body.Close()
 
 	log.Debug(resp) //output from HTML download

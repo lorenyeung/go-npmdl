@@ -21,7 +21,7 @@ type Metadata struct {
 func GetMavenHrefs(url string, base string, MavenWorkerQueue *list.List) string {
 	resp, err := http.Get(url)
 	// this needs to be threaded better..
-	helpers.Check(err, false, "HTTP GET error")
+	helpers.Check(err, false, "HTTP GET error", helpers.Trace())
 	defer resp.Body.Close()
 
 	//fmt.Println(resp) //output from HTML download

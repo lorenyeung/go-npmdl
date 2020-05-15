@@ -25,7 +25,7 @@ type Metadata struct {
 func GetDebianHrefs(url string, base string, index int, component string, debianWorkerQueue *list.List) string {
 	resp, err := http.Get(url)
 	// this needs to be threaded better..
-	helpers.Check(err, false, "HTTP GET error")
+	helpers.Check(err, false, "HTTP GET error", helpers.Trace())
 	defer resp.Body.Close()
 
 	log.Debug(resp) //output from HTML download

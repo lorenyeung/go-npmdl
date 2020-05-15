@@ -43,7 +43,7 @@ type Metadata struct {
 }
 
 //GetDockerImages Docker Engine API search
-func GetDockerImages(artURL string, artUser string, artApikey string, dockerRepo string, url string, base string, index int, component string, dockerWorkerQueue *list.List) string {
+func GetDockerImages(artURL string, artUser string, artApikey string, dockerRepo string, url string, base string, index int, component string, dockerWorkerQueue *list.List, random bool) string {
 
 	//https://github.com/moby/moby/blob/master/client/image_search.go#L17
 	ctx := context.Background()
@@ -57,15 +57,28 @@ func GetDockerImages(artURL string, artUser string, artApikey string, dockerRepo
 		Filters: filters.NewArgs(),
 		Limit:   100,
 	}
+	randomSearchMap := make(map[string]string)
 
 	for i := 33; i <= 58; i++ {
 		for j := 33; j <= 58; j++ {
 			dockerSearchStr := string(rune('A'-1+i)) + string(rune('A'-1+j))
-			log.Debug("Docker searching string:", dockerSearchStr)
-			results, _ := cli.ImageSearch(ctx, dockerSearchStr, imageSearch)
-			dockerSearch(dockerSearchStr, results, artURL, artUser, artApikey, dockerRepo, dockerWorkerQueue)
+			randomSearchMap[dockerSearchStr] = "taken"
+			if !random {
+				log.Debug("Docker ordered search key:", dockerSearchStr)
+				results, _ := cli.ImageSearch(ctx, dockerSearchStr, imageSearch)
+				dockerSearch(dockerSearchStr, results, artURL, artUser, artApikey, dockerRepo, dockerWorkerQueue)
+			}
 		}
 	}
+
+	if random {
+		for key, value := range randomSearchMap {
+			log.Debug("Docker Random result search Key:", key, " Value:", value)
+			results, _ := cli.ImageSearch(ctx, key, imageSearch)
+			dockerSearch(key, results, artURL, artUser, artApikey, dockerRepo, dockerWorkerQueue)
+		}
+	}
+
 	return ""
 }
 
@@ -81,12 +94,8 @@ func dockerSearch(search string, results []registry.SearchResult, artURL string,
 		if err != nil {
 			fmt.Println("error:" + err.Error())
 		}
-		//var wg sync.WaitGroup
-		//wg.Add(len(tags.Tags))
 
 		for y := range tags.Tags {
-			//go func(y int) {
-			//	defer wg.Done()
 			var dockerMd Metadata
 			dockerMd.Image = results[x].Name
 			dockerMd.Tag = tags.Tags[y]
@@ -94,24 +103,22 @@ func dockerSearch(search string, results []registry.SearchResult, artURL string,
 			dockerMd.ManifestURLFile = artURL + "/" + dockerRepo + "/" + results[x].Name + "/" + tags.Tags[y] + "/manifest.json"
 			log.Trace("Docker Queue pushing into queue:", dockerMd.ManifestURLFile)
 			dockerWorkerQueue.PushBack(dockerMd)
-			//	}(y)
-			for dockerWorkerQueue.Len() > 25 {
+
+			for dockerWorkerQueue.Len() > 75 {
 				log.Debug("Docker worker queue is at ", dockerWorkerQueue.Len(), ", sleeping for 5 seconds...")
 				time.Sleep(5 * time.Second)
 			}
 			log.Trace("Queue at:", dockerWorkerQueue.Len(), ", resuming docker worker queue")
 		}
-		//wg.Wait()
 	}
 }
 
 //DlDockerLayers download docker layers
 func DlDockerLayers(creds auth.Creds, md Metadata, repo string, workerNum int) {
-	log.Info("Worker ", workerNum, " Getting manifest for first time:", md.ManifestURLAPI)
 	m := map[string]string{
 		"Accept": "application/vnd.docker.distribution.manifest.v2+json",
 	}
-	log.Debug("Worker ", workerNum, " Getting manifest via metadata:", md.ManifestURLAPI)
+	log.Debug("Worker ", workerNum, " Getting manifest for first time:", md.ManifestURLAPI, " headers:", m)
 	manifest, _, headers := auth.GetRestAPI("GET", true, md.ManifestURLAPI, creds.Username, creds.Apikey, "", m)
 
 	var manifestData dockerManifestMetadata
@@ -119,33 +126,40 @@ func DlDockerLayers(creds auth.Creds, md Metadata, repo string, workerNum int) {
 	if err != nil {
 		log.Warn("Worker ", workerNum, " error mapping manifest:"+err.Error())
 	}
-	log.Trace("Worker ", workerNum, " Manifest headers:", headers, string(manifest), md.Image, md.Tag)
-	log.Debug("Worker ", workerNum, " Manifest recieved data:", headers, manifestData.Config.Digest, manifestData.Config.MediaType)
+	log.Trace("Worker ", workerNum, " Manifest data:", string(manifest), md.Image, md.Tag)
+	log.Debug("Worker ", workerNum, " Manifest recieved data:", headers, manifestData.Config.Digest, manifestData.Config.MediaType, manifestData.SchemaVersion)
+	if manifestData.SchemaVersion != 2 {
+		log.Warn("Worker ", workerNum, " encountered schema version ", manifestData.SchemaVersion, " skipping download")
+		return
+	}
+	log.Debug("Worker ", workerNum, " Getting manifest via metadata:", md.ManifestURLAPI)
 	auth.GetRestAPI("GET", true, creds.URL+"/api/docker/"+repo+"/v2/"+md.Image+"/manifests/"+md.Tag, creds.Username, creds.Apikey, "", nil)
 
 	//iterate through layer download - tried to do concurrent downloads but this usually rekts Artifactory
-	//var wg sync.WaitGroup
-	//wg.Add(len(manifestData.FsLayers))
-	log.Debug("Worker ", workerNum, " Layer count for image ", md.Image, ":", len(manifestData.FsLayers))
+	// var wg sync.WaitGroup
+	// wg.Add(len(manifestData.FsLayers))
+	log.Info("Worker ", workerNum, " Got manifest for image ", md.Image, ":", md.Tag, " contains ", len(manifestData.FsLayers), " layers")
+	skippedLayers := 0
 	for x := range manifestData.FsLayers {
-		//go func(x int) {
-		//defer wg.Done()
-		if x%10 == 0 && x != 0 {
+		// go func(x int) {
+		// 	defer wg.Done()
+		if x%7 == 0 && x != 0 {
 			log.Info("Worker ", workerNum, " Downloaded ", x, " layers of image ", md.Image, ":", md.Tag)
 		}
 		headLoc := creds.URL + "/" + repo + "-cache/" + md.Image + "/" + md.Tag + "/" + strings.Replace(manifestData.FsLayers[x].BlobSum, ":", "__", -1)
 		log.Debug("Worker ", workerNum, " Getting blob:", manifestData.FsLayers[x].BlobSum)
 		_, headStatusCode, _ := auth.GetRestAPI("HEAD", true, headLoc, creds.Username, creds.Apikey, "", nil)
 		if headStatusCode == 200 {
-			log.Debug("Worker ", workerNum, " skipping, got 200 on HEAD request for ", manifestData.FsLayers[x].BlobSum)
+			log.Debug("Worker ", workerNum, " skipping current layer ", x, "/", len(manifestData.FsLayers), " got 200 on HEAD request for ", manifestData.FsLayers[x].BlobSum)
+			skippedLayers++
 			continue
 		}
 		log.Debug("Worker ", workerNum, " Downloading blob:", manifestData.FsLayers[x].BlobSum)
 		blobDownload := creds.URL + "/api/docker/" + repo + "/v2/" + md.Image + "/blobs/" + manifestData.FsLayers[x].BlobSum
 		auth.GetRestAPI("GET", true, blobDownload, creds.Username, creds.Apikey, "", nil)
 		log.Debug("Worker ", workerNum, " Finished Getting blob:", manifestData.FsLayers[x].BlobSum)
-		//}(x)
+		// }(x)
 	}
-	log.Info("Worker ", workerNum, " Finished downloading image:", md.Image, ":", md.Tag)
-	//wg.Wait()
+	//	wg.Wait()
+	log.Info("Worker ", workerNum, " Finished downloading image:", md.Image, ":", md.Tag, ", skipped ", skippedLayers, "/", len(manifestData.FsLayers), " layers as they already existed")
 }

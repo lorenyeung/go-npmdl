@@ -63,7 +63,7 @@ func GenerateDownloadJSON(configPath string, regen bool, masterKey string) Creds
 			continue
 		}
 		if strings.HasSuffix(urlInput, "/") {
-			fmt.Println("stripping trailing /")
+			log.Debug("stripping trailing /")
 			urlInput = strings.TrimSuffix(urlInput, "/")
 		}
 		fmt.Printf("Enter your username [%s]: ", creds.Username)
@@ -95,9 +95,9 @@ func writeFileDownloadJSON(configPath, urlInput, userName, apiKey, dlLocationInp
 	}
 	//should probably encrypt data here
 	fileData, err := json.Marshal(data)
-	helpers.Check(err, true, "The JSON marshal")
+	helpers.Check(err, true, "The JSON marshal", helpers.Trace())
 	err2 := ioutil.WriteFile(configPath, fileData, 0600)
-	helpers.Check(err2, true, "The JSON write")
+	helpers.Check(err2, true, "The JSON write", helpers.Trace())
 
 	data2 := Creds{
 		URL:        urlInput,
@@ -115,7 +115,7 @@ func GetDownloadJSON(fileLocation string, masterKey string) Creds {
 	var resultData Creds
 	file, err := os.Open(fileLocation)
 	if err != nil {
-		log.Print("error:", err)
+		log.Error("error:", err)
 		resultData = GenerateDownloadJSON(fileLocation, false, masterKey)
 	} else {
 		//should decrypt here
@@ -146,13 +146,18 @@ func GetRestAPI(method string, auth bool, urlInput, userName, apiKey, filepath s
 	} else {
 
 		resp, err := client.Do(req)
-		helpers.Check(err, false, "The HTTP response")
+		helpers.Check(err, false, "The HTTP response", helpers.Trace())
 
 		if err != nil {
 			return nil, 0, nil
 		}
-		if resp.StatusCode != 200 {
+		switch resp.StatusCode {
+		case 200:
 			log.Debug("Got status code ", resp.StatusCode, " on ", method, " request for ", urlInput, " continuing")
+		case 404:
+			log.Debug("Got status code ", resp.StatusCode, " on ", method, " request for ", urlInput, " continuing")
+		default:
+			log.Warn("Got status code ", resp.StatusCode, " on ", method, " request for ", urlInput, " continuing")
 		}
 		//Mostly for HEAD requests
 		statusCode := resp.StatusCode
@@ -161,16 +166,17 @@ func GetRestAPI(method string, auth bool, urlInput, userName, apiKey, filepath s
 		if filepath != "" && method == "GET" {
 			// Create the file
 			out, err := os.Create(filepath)
-			helpers.Check(err, false, "File create")
+			helpers.Check(err, false, "File create:"+filepath, helpers.Trace())
 			defer out.Close()
 
 			//done := make(chan int64)
 			//go helpers.PrintDownloadPercent(done, filepath, int64(resp.ContentLength))
 			_, err = io.Copy(out, resp.Body)
-			helpers.Check(err, false, "The file copy")
+			helpers.Check(err, false, "The file copy:"+filepath, helpers.Trace())
 		} else {
 			data, err := ioutil.ReadAll(resp.Body)
-			helpers.Check(err, false, "Data read")
+			helpers.Check(err, false, "Data read:"+urlInput, helpers.Trace())
+
 			return data, statusCode, headers
 		}
 	}
@@ -189,7 +195,7 @@ func Encrypt(dataString string, passphrase string) string {
 	data := []byte(dataString)
 	block, _ := aes.NewCipher([]byte(CreateHash(passphrase)))
 	gcm, err := cipher.NewGCM(block)
-	helpers.Check(err, true, "Cipher")
+	helpers.Check(err, true, "Cipher", helpers.Trace())
 	nonce := make([]byte, gcm.NonceSize())
 	if _, err = io.ReadFull(rand.Reader, nonce); err != nil {
 		panic(err.Error())
@@ -204,9 +210,9 @@ func Decrypt(dataString string, passphrase string) string {
 
 	key := []byte(CreateHash(passphrase))
 	block, err := aes.NewCipher(key)
-	helpers.Check(err, true, "Cipher")
+	helpers.Check(err, true, "Cipher", helpers.Trace())
 	gcm, err := cipher.NewGCM(block)
-	helpers.Check(err, true, "Cipher GCM")
+	helpers.Check(err, true, "Cipher GCM", helpers.Trace())
 	// TODO if decrypt failure
 	//	if err != nil {
 	// 	GenerateDownloadJSON(fileLocation, false, passphrase)
@@ -214,7 +220,7 @@ func Decrypt(dataString string, passphrase string) string {
 	nonceSize := gcm.NonceSize()
 	nonce, ciphertext := data[:nonceSize], data[nonceSize:]
 	plaintext, err := gcm.Open(nil, nonce, ciphertext, nil)
-	helpers.Check(err, true, "GCM open")
+	helpers.Check(err, true, "GCM open", helpers.Trace())
 	return string(plaintext)
 }
 
@@ -225,14 +231,14 @@ func VerifyMasterKey(configPath string) string {
 	if err != nil {
 		log.Warn("Finding master key failed with error %s\n", err)
 		data, err := generateRandomBytes(32)
-		helpers.Check(err, true, "Generating new master key")
+		helpers.Check(err, true, "Generating new master key", helpers.Trace())
 		err2 := ioutil.WriteFile(configPath, []byte(base64.URLEncoding.EncodeToString(data)), 0600)
-		helpers.Check(err2, true, "Master key write")
+		helpers.Check(err2, true, "Master key write", helpers.Trace())
 		log.Info("Successfully generated master key")
 		token = base64.URLEncoding.EncodeToString(data)
 	} else {
 		dat, err := ioutil.ReadFile(configPath)
-		helpers.Check(err, true, "Reading master key")
+		helpers.Check(err, true, "Reading master key", helpers.Trace())
 		token = string(dat)
 	}
 	return token

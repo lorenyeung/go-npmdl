@@ -58,9 +58,9 @@ func GetNPMMetadata(creds auth.Creds, URL, packageIndex, packageName, configPath
 		log.Info("Worker ", workerNum, " Downloading ", packageIndex, i, j.Dist.Tarball)
 		auth.GetRestAPI("GET", true, j.Dist.Tarball, creds.Username, creds.Apikey, configPath+dlFolder+"/"+packageDl, nil)
 		err2 := os.Remove(configPath + dlFolder + "/" + packageDl)
-		helpers.Check(err2, false, "Deleting file")
+		helpers.Check(err2, false, "Deleting file", helpers.Trace())
 	}
-	helpers.Check(err, false, "Reading")
+	helpers.Check(err, false, "Reading", helpers.Trace())
 	if err != nil {
 		return
 	}
@@ -74,7 +74,7 @@ func GetNPMList(configPath string, npmWorkQueue *list.List) {
 	}
 	var result Metadata
 	file, err := os.Open(configPath + "all-npm.json")
-	helpers.Check(err, true, "npm JSON read")
+	helpers.Check(err, true, "npm JSON read", helpers.Trace())
 	byteValue, _ := ioutil.ReadAll(file)
 	json.Unmarshal([]byte(byteValue), &result)
 	for i, j := range result.Rows {
