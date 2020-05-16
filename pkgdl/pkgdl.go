@@ -182,9 +182,9 @@ func main() {
 
 	go func() {
 		for {
-			log.Debug("Running Storage summary check")
+			log.Debug("Running Storage summary check every 5 minutes")
 			auth.StorageCheck(creds, 70, 85)
-			time.Sleep(10 * time.Second)
+			time.Sleep(5 * time.Minute)
 		}
 	}()
 

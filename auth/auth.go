@@ -152,6 +152,10 @@ func StorageCheck(creds Creds, warning float64, threshold float64) {
 		log.Warn("Received bad status code ", statusCode, " trying to get storage info. Proceed with caution")
 		return
 	}
+	//may need to trigger async calculation for newer versions
+	log.Debug("Triggering async POST to update summary page")
+	GetRestAPI("POST", true, creds.URL+"/api/storageinfo/calculate", creds.Username, creds.Apikey, "", nil, 1)
+
 	var storageData StorageDataJSON
 	err := json.Unmarshal(data, &storageData)
 	helpers.Check(err, false, "check failed", helpers.Trace())
