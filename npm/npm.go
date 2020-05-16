@@ -36,7 +36,7 @@ type Metadata struct {
 
 //GetNPMMetadata blah
 func GetNPMMetadata(creds auth.Creds, URL, packageIndex, packageName, configPath string, dlFolder string, workerNum int) {
-	data, _, _ := auth.GetRestAPI("GET", true, URL+packageName, creds.Username, creds.Apikey, "", nil)
+	data, _, _ := auth.GetRestAPI("GET", true, URL+packageName, creds.Username, creds.Apikey, "", nil, 1)
 	var metadata = artifactMetadata{}
 	err := json.Unmarshal([]byte(data), &metadata)
 	if err != nil {
@@ -49,14 +49,14 @@ func GetNPMMetadata(creds auth.Creds, URL, packageIndex, packageName, configPath
 		s := strings.Split(j.Dist.Tarball, URL)
 		//fmt.Println(len(s), "length of s") //413 error
 		if len(s) > 1 && s[1] != "" {
-			_, headStatusCode, _ := auth.GetRestAPI("HEAD", true, creds.URL+"/"+creds.Repository+"-cache/"+s[1], creds.Username, creds.Apikey, "", nil)
+			_, headStatusCode, _ := auth.GetRestAPI("HEAD", true, creds.URL+"/"+creds.Repository+"-cache/"+s[1], creds.Username, creds.Apikey, "", nil, 1)
 			if headStatusCode == 200 {
 				log.Debug("Worker ", workerNum, " skipping, got 200 on HEAD request for ", creds.URL+"/"+creds.Repository+"-cache/"+s[1])
 				continue
 			}
 		}
 		log.Info("Worker ", workerNum, " Downloading ", packageIndex, i, j.Dist.Tarball)
-		auth.GetRestAPI("GET", true, j.Dist.Tarball, creds.Username, creds.Apikey, configPath+dlFolder+"/"+packageDl, nil)
+		auth.GetRestAPI("GET", true, j.Dist.Tarball, creds.Username, creds.Apikey, configPath+dlFolder+"/"+packageDl, nil, 1)
 		err2 := os.Remove(configPath + dlFolder + "/" + packageDl)
 		helpers.Check(err2, false, "Deleting file", helpers.Trace())
 	}
@@ -70,7 +70,7 @@ func GetNPMMetadata(creds auth.Creds, URL, packageIndex, packageName, configPath
 func GetNPMList(configPath string, npmWorkQueue *list.List) {
 	if _, err := os.Stat(configPath + "all-npm.json"); os.IsNotExist(err) {
 		log.Info("No all-npm.json found, creating...")
-		auth.GetRestAPI("GET", false, "https://replicate.npmjs.com/_all_docs", "", "", configPath+"all-npm.json", nil)
+		auth.GetRestAPI("GET", false, "https://replicate.npmjs.com/_all_docs", "", "", configPath+"all-npm.json", nil, 1)
 	}
 	var result Metadata
 	file, err := os.Open(configPath + "all-npm.json")

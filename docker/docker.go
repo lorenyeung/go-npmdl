@@ -88,7 +88,7 @@ func dockerSearch(search string, results []registry.SearchResult, artURL string,
 	for x := range results {
 		var tags dockerTagMetadata
 		// can probably hit artifactory harder with this call
-		data, _, _ := auth.GetRestAPI("GET", true, artURL+"/api/docker/"+dockerRepo+"/v2/"+results[x].Name+"/tags/list", artUser, artApikey, "", nil)
+		data, _, _ := auth.GetRestAPI("GET", true, artURL+"/api/docker/"+dockerRepo+"/v2/"+results[x].Name+"/tags/list", artUser, artApikey, "", nil, 1)
 
 		err := json.Unmarshal([]byte(data), &tags)
 		if err != nil {
@@ -119,12 +119,14 @@ func DlDockerLayers(creds auth.Creds, md Metadata, repo string, workerNum int) {
 		"Accept": "application/vnd.docker.distribution.manifest.v2+json",
 	}
 	log.Debug("Worker ", workerNum, " Getting manifest for first time:", md.ManifestURLAPI, " headers:", m)
-	manifest, _, headers := auth.GetRestAPI("GET", true, md.ManifestURLAPI, creds.Username, creds.Apikey, "", m)
+	manifest, _, headers := auth.GetRestAPI("GET", true, md.ManifestURLAPI, creds.Username, creds.Apikey, "", m, 1)
 
 	var manifestData dockerManifestMetadata
 	err := json.Unmarshal(manifest, &manifestData)
 	if err != nil {
-		log.Warn("Worker ", workerNum, " error mapping manifest:"+err.Error())
+		log.Warn("Worker ", workerNum, " error mapping manifest:", md.Image, ":", md.Tag, " skipping further image download due to:"+err.Error())
+		//TODO, delete manifest maybe
+		return
 	}
 	log.Trace("Worker ", workerNum, " Manifest data:", string(manifest), md.Image, md.Tag)
 	log.Debug("Worker ", workerNum, " Manifest recieved data:", headers, manifestData.Config.Digest, manifestData.Config.MediaType, manifestData.SchemaVersion)
@@ -133,7 +135,7 @@ func DlDockerLayers(creds auth.Creds, md Metadata, repo string, workerNum int) {
 		return
 	}
 	log.Debug("Worker ", workerNum, " Getting manifest via metadata:", md.ManifestURLAPI)
-	auth.GetRestAPI("GET", true, creds.URL+"/api/docker/"+repo+"/v2/"+md.Image+"/manifests/"+md.Tag, creds.Username, creds.Apikey, "", nil)
+	auth.GetRestAPI("GET", true, creds.URL+"/api/docker/"+repo+"/v2/"+md.Image+"/manifests/"+md.Tag, creds.Username, creds.Apikey, "", nil, 1)
 
 	//iterate through layer download - tried to do concurrent downloads but this usually rekts Artifactory
 	// var wg sync.WaitGroup
@@ -144,11 +146,11 @@ func DlDockerLayers(creds auth.Creds, md Metadata, repo string, workerNum int) {
 		// go func(x int) {
 		// 	defer wg.Done()
 		if x%7 == 0 && x != 0 {
-			log.Info("Worker ", workerNum, " Downloaded ", x, " layers of image ", md.Image, ":", md.Tag)
+			log.Info("Worker ", workerNum, " Downloaded ", x, " layers of image ", md.Image, ":", md.Tag, " skipped ", skippedLayers, "/", len(manifestData.FsLayers), " layers as they already existed")
 		}
 		headLoc := creds.URL + "/" + repo + "-cache/" + md.Image + "/" + md.Tag + "/" + strings.Replace(manifestData.FsLayers[x].BlobSum, ":", "__", -1)
 		log.Debug("Worker ", workerNum, " Getting blob:", manifestData.FsLayers[x].BlobSum)
-		_, headStatusCode, _ := auth.GetRestAPI("HEAD", true, headLoc, creds.Username, creds.Apikey, "", nil)
+		_, headStatusCode, _ := auth.GetRestAPI("HEAD", true, headLoc, creds.Username, creds.Apikey, "", nil, 1)
 		if headStatusCode == 200 {
 			log.Debug("Worker ", workerNum, " skipping current layer ", x, "/", len(manifestData.FsLayers), " got 200 on HEAD request for ", manifestData.FsLayers[x].BlobSum)
 			skippedLayers++
@@ -156,7 +158,7 @@ func DlDockerLayers(creds auth.Creds, md Metadata, repo string, workerNum int) {
 		}
 		log.Debug("Worker ", workerNum, " Downloading blob:", manifestData.FsLayers[x].BlobSum)
 		blobDownload := creds.URL + "/api/docker/" + repo + "/v2/" + md.Image + "/blobs/" + manifestData.FsLayers[x].BlobSum
-		auth.GetRestAPI("GET", true, blobDownload, creds.Username, creds.Apikey, "", nil)
+		auth.GetRestAPI("GET", true, blobDownload, creds.Username, creds.Apikey, "", nil, 1)
 		log.Debug("Worker ", workerNum, " Finished Getting blob:", manifestData.FsLayers[x].BlobSum)
 		// }(x)
 	}

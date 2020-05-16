@@ -15,7 +15,9 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
+	"time"
 
 	log "github.com/Sirupsen/logrus"
 
@@ -31,10 +33,23 @@ type Creds struct {
 	Repository string
 }
 
+//StorageDataJSON storage summary JSON
+type StorageDataJSON struct {
+	StorageSummary struct {
+		FileStoreSummary struct {
+			UsedSpace string `json:"usedSpace"`
+			FreeSpace string `json:"freeSpace"`
+		} `json:"fileStoreSummary"`
+		RepositoriesSummaryList []struct {
+			RepoKey string `json:"repoKey"`
+		} `json: "repositoriesSummaryList"`
+	} `json:"storageSummary"`
+}
+
 // VerifyAPIKey for errors
 func VerifyAPIKey(urlInput, userName, apiKey string) bool {
 	log.Debug("starting VerifyAPIkey request. Testing:", userName)
-	data, _, _ := GetRestAPI("GET", true, urlInput+"/api/system/ping", userName, apiKey, "", nil)
+	data, _, _ := GetRestAPI("GET", true, urlInput+"/api/system/ping", userName, apiKey, "", nil, 1)
 	if string(data) == "OK" {
 		log.Debug("finished VerifyAPIkey request. Credentials are good to go.")
 		return true
@@ -130,8 +145,37 @@ func GetDownloadJSON(fileLocation string, masterKey string) Creds {
 	return resultData
 }
 
+//
+func StorageCheck(creds Creds, warning float64, threshold float64) {
+	data, statusCode, _ := GetRestAPI("GET", true, creds.URL+"/api/storageinfo", creds.Username, creds.Apikey, "", nil, 1)
+	if statusCode != 200 {
+		log.Warn("Received bad status code ", statusCode, " trying to get storage info. Proceed with caution")
+		return
+	}
+	var storageData StorageDataJSON
+	err := json.Unmarshal(data, &storageData)
+	helpers.Check(err, false, "check failed", helpers.Trace())
+	log.Debug("free:", storageData.StorageSummary.FileStoreSummary.FreeSpace, " used:", storageData.StorageSummary.FileStoreSummary.UsedSpace)
+	used := strings.Split(storageData.StorageSummary.FileStoreSummary.UsedSpace, "(")
+	usedpc := strings.TrimRight(used[1], "%)")
+	i, err := strconv.ParseFloat(usedpc, 32)
+
+	if i >= threshold {
+		log.Panic("Summary reporting that disk hit threshold ", warning, "% usage, (", used[1], " killing all downloads")
+		os.Exit(1)
+
+	} else if i >= warning {
+		log.Warn("Summary reporting that disk is over warning ", warning, "% usage, (", used[1], " proceed with caution")
+	}
+
+}
+
 //GetRestAPI GET rest APIs response with error handling
-func GetRestAPI(method string, auth bool, urlInput, userName, apiKey, filepath string, header map[string]string) ([]byte, int, http.Header) {
+func GetRestAPI(method string, auth bool, urlInput, userName, apiKey, filepath string, header map[string]string, retry int) ([]byte, int, http.Header) {
+	if retry > 5 {
+		log.Warn("Exceeded retry limit, cancelling further attempts")
+		return nil, 0, nil
+	}
 	client := http.Client{}
 	req, err := http.NewRequest(method, urlInput, nil)
 	if auth {
@@ -151,13 +195,29 @@ func GetRestAPI(method string, auth bool, urlInput, userName, apiKey, filepath s
 		if err != nil {
 			return nil, 0, nil
 		}
+		// need to account for 403s with xray, or other 403s, 429? 204 is bad too (no content for docker)
 		switch resp.StatusCode {
 		case 200:
-			log.Debug("Got status code ", resp.StatusCode, " on ", method, " request for ", urlInput, " continuing")
+			log.Debug("Received ", resp.StatusCode, " OK on ", method, " request for ", urlInput, " continuing")
+		case 403:
+			log.Error("Received ", resp.StatusCode, " Forbidden on ", method, " request for ", urlInput, " continuing")
+			// should we try retry here? probably not
 		case 404:
-			log.Debug("Got status code ", resp.StatusCode, " on ", method, " request for ", urlInput, " continuing")
+			log.Debug("Received ", resp.StatusCode, " Not Found on ", method, " request for ", urlInput, " continuing")
+		case 429:
+			log.Error("Received ", resp.StatusCode, " Too Many Requests on ", method, " request for ", urlInput, ", sleeping then retrying, attempt ", retry)
+			time.Sleep(10 * time.Second)
+			GetRestAPI(method, auth, urlInput, userName, apiKey, filepath, header, retry+1)
+		case 204:
+			if method == "GET" {
+				log.Error("Received ", resp.StatusCode, " No Content on ", method, " request for ", urlInput, ", sleeping then retrying")
+				time.Sleep(10 * time.Second)
+				GetRestAPI(method, auth, urlInput, userName, apiKey, filepath, header, retry+1)
+			} else {
+				log.Debug("Received ", resp.StatusCode, " OK on ", method, " request for ", urlInput, " continuing")
+			}
 		default:
-			log.Warn("Got status code ", resp.StatusCode, " on ", method, " request for ", urlInput, " continuing")
+			log.Warn("Received ", resp.StatusCode, " on ", method, " request for ", urlInput, " continuing")
 		}
 		//Mostly for HEAD requests
 		statusCode := resp.StatusCode
@@ -174,8 +234,15 @@ func GetRestAPI(method string, auth bool, urlInput, userName, apiKey, filepath s
 			_, err = io.Copy(out, resp.Body)
 			helpers.Check(err, false, "The file copy:"+filepath, helpers.Trace())
 		} else {
+			//maybe skip the download or retry if error here, like EOF
 			data, err := ioutil.ReadAll(resp.Body)
 			helpers.Check(err, false, "Data read:"+urlInput, helpers.Trace())
+			if err != nil {
+				log.Warn("Data Read on ", urlInput, " failed with:", err, ", sleeping then retrying, attempt:", retry)
+				time.Sleep(10 * time.Second)
+
+				GetRestAPI(method, auth, urlInput, userName, apiKey, filepath, header, retry+1)
+			}
 
 			return data, statusCode, headers
 		}

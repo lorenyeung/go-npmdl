@@ -19,7 +19,7 @@ type TraceData struct {
 //Check logger for errors
 func Check(e error, panic bool, logs string, trace TraceData) {
 	if e != nil && panic {
-		log.Error(logs, " failed with error:", e, " ", trace.Fn, " on line:", trace.Line)
+		log.Panic(logs, " failed with error:", e, " ", trace.Fn, " on line:", trace.Line)
 	}
 	if e != nil && !panic {
 		log.Warn(logs, " failed with error:", e, " ", trace.Fn, " on line:", trace.Line)

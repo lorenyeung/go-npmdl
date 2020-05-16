@@ -180,6 +180,16 @@ func main() {
 		os.Exit(0)
 	}
 
+	go func() {
+		for {
+			log.Debug("Running Storage summary check")
+			auth.StorageCheck(creds, 70, 85)
+			time.Sleep(10 * time.Second)
+		}
+	}()
+
+	//TODO: storage summary check, make sure there is enough space.
+
 	//work queue
 	var ch = make(chan interface{}, workersVar+1)
 	var wg sync.WaitGroup
@@ -199,7 +209,7 @@ func main() {
 				case "debian":
 					md := s.(debian.Metadata)
 					standardDownload(creds, md.URL, md.File, configPath, pkgRepoDlFolder, repoVar)
-					auth.GetRestAPI("PUT", true, creds.URL+"/api/storage/"+repoVar+"-cache"+md.URL+"?properties=deb.component="+md.Component+";deb.architecture="+md.Architecture+";deb.distribution="+md.Distribution, creds.Username, creds.Apikey, "", nil)
+					auth.GetRestAPI("PUT", true, creds.URL+"/api/storage/"+repoVar+"-cache"+md.URL+"?properties=deb.component="+md.Component+";deb.architecture="+md.Architecture+";deb.distribution="+md.Distribution, creds.Username, creds.Apikey, "", nil, 1)
 
 				case "docker":
 					md := s.(docker.Metadata)
@@ -250,21 +260,21 @@ func main() {
 }
 
 func standardDownload(creds auth.Creds, dlURL string, file string, configPath string, pkgRepoDlFolder string, repoVar string) {
-	_, headStatusCode, _ := auth.GetRestAPI("HEAD", true, creds.URL+"/"+repoVar+"-cache/"+dlURL, creds.Username, creds.Apikey, "", nil)
+	_, headStatusCode, _ := auth.GetRestAPI("HEAD", true, creds.URL+"/"+repoVar+"-cache/"+dlURL, creds.Username, creds.Apikey, "", nil, 1)
 	if headStatusCode == 200 {
 		log.Debug("skipping, got 200 on HEAD request for %s\n", creds.URL+"/"+repoVar+"-cache/"+dlURL)
 		return
 	}
 
 	log.Info("Downloading", creds.URL+"/"+repoVar+dlURL)
-	auth.GetRestAPI("GET", true, creds.URL+"/"+repoVar+dlURL, creds.Username, creds.Apikey, configPath+pkgRepoDlFolder+"/"+file, nil)
+	auth.GetRestAPI("GET", true, creds.URL+"/"+repoVar+dlURL, creds.Username, creds.Apikey, configPath+pkgRepoDlFolder+"/"+file, nil, 1)
 	os.Remove(configPath + pkgRepoDlFolder + "/" + file)
 
 }
 
 //Test if remote repository exists and is a remote
 func checkTypeAndRepoParams(creds auth.Creds, repoVar string) (string, string, string, string) {
-	repoCheckData, repoStatusCode, _ := auth.GetRestAPI("GET", true, creds.URL+"/api/repositories/"+repoVar, creds.Username, creds.Apikey, "", nil)
+	repoCheckData, repoStatusCode, _ := auth.GetRestAPI("GET", true, creds.URL+"/api/repositories/"+repoVar, creds.Username, creds.Apikey, "", nil, 1)
 	if repoStatusCode != 200 {
 		log.Error("Repo", repoVar, "does not exist.")
 		os.Exit(0)
