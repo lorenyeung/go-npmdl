@@ -1,11 +1,14 @@
 package helpers
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"runtime"
+	"strings"
 	"time"
 
+	"github.com/Sirupsen/logrus"
 	log "github.com/Sirupsen/logrus"
 )
 
@@ -16,12 +19,36 @@ type TraceData struct {
 	Fn   string
 }
 
-//Check logger for errors
-func Check(e error, panic bool, logs string, trace TraceData) {
-	if e != nil && panic {
-		log.Panic(logs, " failed with error:", e, " ", trace.Fn, " on line:", trace.Line)
+//SetLogger sets logger settings
+func SetLogger(logLevelVar string) {
+	level, err := log.ParseLevel(logLevelVar)
+	if err != nil {
+		level = log.InfoLevel
 	}
-	if e != nil && !panic {
+	log.SetLevel(level)
+
+	log.SetReportCaller(true)
+	customFormatter := new(logrus.TextFormatter)
+	customFormatter.TimestampFormat = "2006-01-02 15:04:05"
+	customFormatter.QuoteEmptyFields = true
+	customFormatter.FullTimestamp = true
+	customFormatter.CallerPrettyfier = func(f *runtime.Frame) (string, string) {
+		repopath := strings.Split(f.File, "/")
+		function := strings.Replace(f.Function, "go-pkgdl/", "", -1)
+		return fmt.Sprintf("%s\t", function), fmt.Sprintf(" %s:%d\t", repopath[len(repopath)-1], f.Line)
+	}
+
+	logrus.SetFormatter(customFormatter)
+	log.Info("Log level set at ", level)
+}
+
+//Check logger for errors
+func Check(e error, panicCheck bool, logs string, trace TraceData) {
+	if e != nil && panicCheck {
+		log.Error(logs, " failed with error:", e, " ", trace.Fn, " on line:", trace.Line)
+		panic(e)
+	}
+	if e != nil && !panicCheck {
 		log.Warn(logs, " failed with error:", e, " ", trace.Fn, " on line:", trace.Line)
 	}
 }
@@ -72,4 +99,32 @@ func PrintDownloadPercent(done chan int64, path string, total int64) {
 		}
 		time.Sleep(time.Second)
 	}
+}
+
+//Flags struct
+type Flags struct {
+	WorkersVar, WorkerSleepVar, DuCheckVar               int
+	StorageWarningVar, StorageThresholdVar               float64
+	UsernameVar, ApikeyVar, URLVar, RepoVar, LogLevelVar string
+	ResetVar, ValuesVar, RandomVar                       bool
+}
+
+//SetFlags function
+func SetFlags() Flags {
+	var flags Flags
+	flag.StringVar(&flags.LogLevelVar, "log", "INFO", "Order of Severity: TRACE, DEBUG, INFO, WARN, ERROR, FATAL, PANIC")
+	flag.IntVar(&flags.WorkersVar, "workers", 50, "Number of workers")
+	flag.IntVar(&flags.WorkerSleepVar, "workersleep", 5, "Worker sleep period in seconds")
+	flag.IntVar(&flags.DuCheckVar, "ducheck", 5, "Disk Usage check in minutes")
+	flag.Float64Var(&flags.StorageWarningVar, "duwarn", 70, "Set Disk usage warning in %")
+	flag.Float64Var(&flags.StorageThresholdVar, "duthreshold", 85, "Set Disk usage threshold in %")
+	flag.StringVar(&flags.UsernameVar, "user", "", "Username")
+	flag.StringVar(&flags.ApikeyVar, "apikey", "", "API key or password")
+	flag.StringVar(&flags.URLVar, "url", "", "Binary Manager URL")
+	flag.StringVar(&flags.RepoVar, "repo", "", "Download Repository")
+	flag.BoolVar(&flags.ResetVar, "reset", false, "Reset creds file")
+	flag.BoolVar(&flags.ValuesVar, "values", false, "Output values")
+	flag.BoolVar(&flags.RandomVar, "random", false, "Attempt to pull packages in random queue order")
+	flag.Parse()
+	return flags
 }

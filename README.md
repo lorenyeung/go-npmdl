@@ -1,7 +1,7 @@
 # pkgdl go script
 
 ## Purpose
-Download a bunch of packages and cache them in an Binary Manager's remote repository
+Download a bunch of packages and cache them in a Binary Manager's remote repository
 
 ## Installation
 Find your go home (`go env`) 
@@ -14,7 +14,7 @@ then run
 
 `$ go run $GO_HOME/src/go-pkgdl/pkgdl/pkgdl.go`
 
-!Happy downloading!! :)
+Happy downloading! :)
 
 Quick install steps for Debian
 ```

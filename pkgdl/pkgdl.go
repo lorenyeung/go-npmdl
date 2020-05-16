@@ -4,7 +4,6 @@ import (
 	"container/list"
 	"encoding/json"
 	"flag"
-	"fmt"
 	"go-pkgdl/auth"
 	"go-pkgdl/debian"
 	"go-pkgdl/docker"
@@ -16,50 +15,17 @@ import (
 	"go-pkgdl/rpm"
 	"os"
 	"os/user"
-	"runtime"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/Sirupsen/logrus"
 	log "github.com/Sirupsen/logrus"
 )
 
 func main() {
 
-	var workersVar int
-	var usernameVar, apikeyVar, urlVar, repoVar, logLevelVar string
-	var resetVar, valuesVar, randomVar bool
-	flag.StringVar(&logLevelVar, "log", "INFO", "Order of Severity: TRACE, DEBUG, INFO, WARN, ERROR, FATAL, PANIC")
-	flag.IntVar(&workersVar, "workers", 50, "Number of workers")
-	flag.StringVar(&usernameVar, "user", "", "Username")
-	flag.StringVar(&apikeyVar, "apikey", "", "API key")
-	flag.StringVar(&urlVar, "url", "", "URL")
-	flag.StringVar(&repoVar, "repo", "", "Download Repository")
-	flag.BoolVar(&resetVar, "reset", false, "Reset creds file")
-	flag.BoolVar(&valuesVar, "values", false, "Output values")
-	flag.BoolVar(&randomVar, "random", false, "Attempt to pull packages in random queue order")
-	flag.Parse()
-
-	level, err := log.ParseLevel(logLevelVar)
-	if err != nil {
-		level = log.InfoLevel
-	}
-	log.SetLevel(level)
-
-	log.SetReportCaller(true)
-	customFormatter := new(logrus.TextFormatter)
-	customFormatter.TimestampFormat = "2006-01-02 15:04:05"
-	customFormatter.QuoteEmptyFields = true
-	customFormatter.FullTimestamp = true
-	customFormatter.CallerPrettyfier = func(f *runtime.Frame) (string, string) {
-		repopath := strings.Split(f.File, "/")
-		function := strings.Replace(f.Function, "go-pkgdl/", "", -1)
-		return fmt.Sprintf("%s\t", function), fmt.Sprintf(" %s:%d\t", repopath[len(repopath)-1], f.Line)
-	}
-
-	logrus.SetFormatter(customFormatter)
-	log.Info("Log level set at ", level)
+	flags := helpers.SetFlags()
+	helpers.SetLogger(flags.LogLevelVar)
 
 	supportedTypes := [7]string{"debian", "docker", "generic", "maven", "npm", "pypi", "rpm"}
 	usr, err := user.Current()
@@ -84,41 +50,41 @@ func main() {
 	masterKey := auth.VerifyMasterKey(configPath + "master.key")
 	creds := auth.GetDownloadJSON(configPath+"download.json", masterKey)
 
-	if usernameVar == "" {
-		usernameVar = creds.Username
+	if flags.UsernameVar == "" {
+		flags.UsernameVar = creds.Username
 	}
-	if apikeyVar == "" {
-		apikeyVar = creds.Apikey
+	if flags.ApikeyVar == "" {
+		flags.ApikeyVar = creds.Apikey
 	}
-	if urlVar == "" {
-		urlVar = creds.URL
+	if flags.URLVar == "" {
+		flags.URLVar = creds.URL
 	}
 
-	if (repoVar == "") && resetVar != true && valuesVar != true {
+	if (flags.RepoVar == "") && flags.ResetVar != true && flags.ValuesVar != true {
 		log.Error("Must specify -repo <Repository>")
 		flag.PrintDefaults()
 		os.Exit(0)
 	}
-	if valuesVar == true {
+	if flags.ValuesVar == true {
 		log.Info("User: ", creds.Username, "\nURL: ", creds.URL, "\nDownload location: ", creds.DlLocation)
 		os.Exit(0)
 	}
 
-	if resetVar == true {
+	if flags.ResetVar == true {
 		creds = auth.GenerateDownloadJSON(configPath+"download.json", true, masterKey)
-		usernameVar = creds.Username
-		apikeyVar = creds.Apikey
-		urlVar = creds.URL
+		flags.UsernameVar = creds.Username
+		flags.ApikeyVar = creds.Apikey
+		flags.URLVar = creds.URL
 	}
 
-	if !auth.VerifyAPIKey(urlVar, usernameVar, apikeyVar) {
-		if creds.Username == usernameVar && creds.Apikey == apikeyVar && creds.URL == urlVar {
+	if !auth.VerifyAPIKey(flags.URLVar, flags.UsernameVar, flags.ApikeyVar) {
+		if creds.Username == flags.UsernameVar && creds.Apikey == flags.ApikeyVar && creds.URL == flags.URLVar {
 			log.Warn("Looks like there's an issue with your credentials file. Resetting")
 			auth.GenerateDownloadJSON(configPath+"download.json", true, masterKey)
 			creds = auth.GetDownloadJSON(configPath+"download.json", masterKey)
-			usernameVar = creds.Username
-			apikeyVar = creds.Apikey
-			urlVar = creds.URL
+			flags.UsernameVar = creds.Username
+			flags.ApikeyVar = creds.Apikey
+			flags.URLVar = creds.URL
 
 		} else {
 			log.Error("Looks like there's an issue with your custom credentials. Exiting")
@@ -127,11 +93,11 @@ func main() {
 	}
 
 	//update custom
-	creds.Username = usernameVar
-	creds.Apikey = apikeyVar
-	creds.URL = urlVar
+	creds.Username = flags.UsernameVar
+	creds.Apikey = flags.ApikeyVar
+	creds.URL = flags.URLVar
 
-	var repotype, extractedURL, pypiRegistryURL, pypiRepoSuffix = checkTypeAndRepoParams(creds, repoVar)
+	var repotype, extractedURL, pypiRegistryURL, pypiRepoSuffix = checkTypeAndRepoParams(creds, flags.RepoVar)
 	pkgRepoDlFolder := repotype + "Downloads"
 
 	//case switch for different package types
@@ -146,7 +112,7 @@ func main() {
 	case "docker":
 		log.Warn("Work in progress, only works against Docker Hub")
 		go func() {
-			docker.GetDockerImages(creds.URL, creds.Username, creds.Apikey, repoVar, extractedURL, extractedURLStripped, 1, "", workQueue, randomVar)
+			docker.GetDockerImages(creds.URL, creds.Username, creds.Apikey, flags.RepoVar, extractedURL, extractedURLStripped, 1, "", workQueue, flags.RandomVar, flags.WorkerSleepVar)
 		}()
 
 	case "generic":
@@ -180,21 +146,19 @@ func main() {
 		os.Exit(0)
 	}
 
+	//disk usage check
 	go func() {
 		for {
-			log.Debug("Running Storage summary check every 5 minutes")
-			auth.StorageCheck(creds, 70, 85)
-			time.Sleep(5 * time.Minute)
+			log.Debug("Running Storage summary check every ", flags.DuCheckVar, " minutes")
+			auth.StorageCheck(creds, flags.StorageWarningVar, flags.StorageThresholdVar)
+			time.Sleep(time.Duration(flags.DuCheckVar) * time.Minute)
 		}
 	}()
 
-	//TODO: storage summary check, make sure there is enough space.
-
 	//work queue
-	var ch = make(chan interface{}, workersVar+1)
+	var ch = make(chan interface{}, flags.WorkersVar+1)
 	var wg sync.WaitGroup
-	for i := 0; i < workersVar; i++ {
-		//wg.Add(1)
+	for i := 0; i < flags.WorkersVar; i++ {
 		go func(i int) {
 			for {
 
@@ -202,46 +166,44 @@ func main() {
 				if !ok {
 					log.Info("Worker being returned to queue?", i)
 					wg.Done()
-					//return
 				}
 				log.Debug("worker ", i, " starting job")
 				switch repotype {
 				case "debian":
 					md := s.(debian.Metadata)
-					standardDownload(creds, md.URL, md.File, configPath, pkgRepoDlFolder, repoVar)
-					auth.GetRestAPI("PUT", true, creds.URL+"/api/storage/"+repoVar+"-cache"+md.URL+"?properties=deb.component="+md.Component+";deb.architecture="+md.Architecture+";deb.distribution="+md.Distribution, creds.Username, creds.Apikey, "", nil, 1)
+					standardDownload(creds, md.URL, md.File, configPath, pkgRepoDlFolder, flags.RepoVar)
+					auth.GetRestAPI("PUT", true, creds.URL+"/api/storage/"+flags.RepoVar+"-cache"+md.URL+"?properties=deb.component="+md.Component+";deb.architecture="+md.Architecture+";deb.distribution="+md.Distribution, creds.Username, creds.Apikey, "", nil, 1)
 
 				case "docker":
 					md := s.(docker.Metadata)
-					docker.DlDockerLayers(creds, md, repoVar, i)
+					docker.DlDockerLayers(creds, md, flags.RepoVar, i)
 
 				case "maven":
 					md := s.(maven.Metadata)
-					standardDownload(creds, md.URL, md.File, configPath, pkgRepoDlFolder, repoVar)
+					standardDownload(creds, md.URL, md.File, configPath, pkgRepoDlFolder, flags.RepoVar)
 
 				case "npm":
 					md := s.(npm.Metadata)
-					npm.GetNPMMetadata(creds, creds.URL+"/api/npm/"+repoVar+"/", md.ID, md.Package, configPath, pkgRepoDlFolder, i)
+					npm.GetNPMMetadata(creds, creds.URL+"/api/npm/"+flags.RepoVar+"/", md.ID, md.Package, configPath, pkgRepoDlFolder, i)
 
 				case "pypi":
 					md := s.(pypi.Metadata)
-					standardDownload(creds, md.URL, md.File, configPath, pkgRepoDlFolder, repoVar)
+					standardDownload(creds, md.URL, md.File, configPath, pkgRepoDlFolder, flags.RepoVar)
 
 				case "rpm":
 					md := s.(rpm.Metadata)
-					standardDownload(creds, md.URL, md.File, configPath, pkgRepoDlFolder, repoVar)
+					standardDownload(creds, md.URL, md.File, configPath, pkgRepoDlFolder, flags.RepoVar)
 				}
 				log.Debug("worker ", i, " finished job")
 			}
-			//wg.Done()
 		}(i)
 
 	}
 	for {
 		var count0 = 0
 		for workQueue.Len() == 0 {
-			log.Info(repotype, " work queue is empty, sleeping for 5 seconds...")
-			time.Sleep(5 * time.Second)
+			log.Info(repotype, " work queue is empty, sleeping for ", flags.WorkerSleepVar, " seconds...")
+			time.Sleep(time.Duration(flags.WorkerSleepVar) * time.Second)
 			count0++
 			if count0 > 10 {
 				log.Warn("Looks like nothing's getting put into the workqueue. You might want to enable -debug and take a look")
