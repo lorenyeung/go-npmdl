@@ -13,6 +13,8 @@ import (
 	"go-pkgdl/npm"
 	"go-pkgdl/pypi"
 	"go-pkgdl/rpm"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/user"
 	"strings"
@@ -118,7 +120,7 @@ func main() {
 	case "generic":
 		log.Warn("Work in progress")
 		go func() {
-			generic.GetGenericHrefs(extractedURL, extractedURLStripped, workQueue)
+			generic.GetGenericHrefs(extractedURL, extractedURLStripped, workQueue, flags.WorkerSleepVar)
 
 		}()
 
@@ -204,6 +206,11 @@ func main() {
 		}(i)
 
 	}
+
+	//debug port
+	go func() {
+		http.ListenAndServe("0.0.0.0:8080", nil)
+	}()
 	for {
 		var count0 = 0
 		for workQueue.Len() == 0 {

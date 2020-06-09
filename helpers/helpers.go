@@ -39,7 +39,7 @@ func SetLogger(logLevelVar string) {
 	}
 
 	logrus.SetFormatter(customFormatter)
-	log.Info("Log level set at ", level)
+	fmt.Println("Log level set at ", level)
 }
 
 //Check logger for errors

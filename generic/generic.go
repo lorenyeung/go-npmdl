@@ -24,15 +24,20 @@ type Metadata struct {
 }
 
 //GetGenericHrefs parse hrefs for Generic files
-func GetGenericHrefs(url string, base string, GenericWorkerQueue *list.List) string {
+func GetGenericHrefs(url string, base string, GenericWorkerQueue *list.List, workerSleepVar int) string {
 	if url == "" {
 		//must be a local repo, send to generic file generator instead
 		for {
+			if GenericWorkerQueue.Len() > 10000 {
+				log.Debug("Generic worker queue is at ", GenericWorkerQueue.Len(), ", sleeping for ", workerSleepVar, " seconds...")
+				time.Sleep(time.Duration(workerSleepVar) * time.Second)
+			}
 			randomString := RandStringBytesMaskImprSrcSB(10)
 			var GenericMd Metadata
 			GenericMd.URL = ""
 			GenericMd.File = randomString
 			GenericWorkerQueue.PushBack(GenericMd)
+
 		}
 	} else {
 		resp, err := http.Get(url)
@@ -61,7 +66,7 @@ func GetGenericHrefs(url string, base string, GenericWorkerQueue *list.List) str
 						if a.Key == "href" && (strings.HasSuffix(a.Val, "/")) {
 
 							strip := strings.TrimPrefix(a.Val, ":")
-							GetGenericHrefs(url+strip, base, GenericWorkerQueue)
+							GetGenericHrefs(url+strip, base, GenericWorkerQueue, workerSleepVar)
 							break
 						}
 					}
