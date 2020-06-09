@@ -119,6 +119,7 @@ func main() {
 		log.Warn("Work in progress")
 		go func() {
 			generic.GetGenericHrefs(extractedURL, extractedURLStripped, workQueue)
+
 		}()
 
 	case "maven":
@@ -178,13 +179,17 @@ func main() {
 					md := s.(docker.Metadata)
 					docker.DlDockerLayers(creds, md, flags.RepoVar, i)
 
+				case "generic":
+					md := s.(generic.Metadata)
+					generic.CreateAndUploadFile(creds, md, flags, configPath, pkgRepoDlFolder, i)
+
 				case "maven":
 					md := s.(maven.Metadata)
 					standardDownload(creds, md.URL, md.File, configPath, pkgRepoDlFolder, flags.RepoVar)
 
 				case "npm":
 					md := s.(npm.Metadata)
-					npm.GetNPMMetadata(creds, creds.URL+"/api/npm/"+flags.RepoVar+"/", md.ID, md.Package, configPath, pkgRepoDlFolder, i)
+					npm.GetNPMMetadata(creds, creds.URL+"/api/npm/"+flags.RepoVar+"/", md.ID, md.Package, configPath, pkgRepoDlFolder, i, flags)
 
 				case "pypi":
 					md := s.(pypi.Metadata)
@@ -231,8 +236,9 @@ func standardDownload(creds auth.Creds, dlURL string, file string, configPath st
 	log.Info("Downloading", creds.URL+"/"+repoVar+dlURL)
 	auth.GetRestAPI("GET", true, creds.URL+"/"+repoVar+dlURL, creds.Username, creds.Apikey, configPath+pkgRepoDlFolder+"/"+file, nil, 1)
 	os.Remove(configPath + pkgRepoDlFolder + "/" + file)
-
 }
+
+//func standardUpload()
 
 //Test if remote repository exists and is a remote
 func checkTypeAndRepoParams(creds auth.Creds, repoVar string) (string, string, string, string) {
@@ -243,8 +249,12 @@ func checkTypeAndRepoParams(creds auth.Creds, repoVar string) (string, string, s
 	}
 	var result map[string]interface{}
 	json.Unmarshal([]byte(repoCheckData), &result)
-	if result["rclass"] != "remote" {
+	//TODO: hard code for now, mass upload of files
+	if result["rclass"] == "local" && result["packageType"].(string) == "generic" {
+		return result["packageType"].(string), "", "", ""
+	} else if result["rclass"] != "remote" {
 		log.Error(repoVar, "is a", result["rclass"], "repository and not a remote repository.")
+		//maybe here.
 		os.Exit(0)
 	}
 	if result["packageType"].(string) == "pypi" {

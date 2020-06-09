@@ -106,7 +106,7 @@ type Flags struct {
 	WorkersVar, WorkerSleepVar, DuCheckVar               int
 	StorageWarningVar, StorageThresholdVar               float64
 	UsernameVar, ApikeyVar, URLVar, RepoVar, LogLevelVar string
-	ResetVar, ValuesVar, RandomVar                       bool
+	ResetVar, ValuesVar, RandomVar, NpmMetadataVar       bool
 }
 
 //SetFlags function
@@ -125,6 +125,7 @@ func SetFlags() Flags {
 	flag.BoolVar(&flags.ResetVar, "reset", false, "Reset creds file")
 	flag.BoolVar(&flags.ValuesVar, "values", false, "Output values")
 	flag.BoolVar(&flags.RandomVar, "random", false, "Attempt to pull packages in random queue order")
+	flag.BoolVar(&flags.NpmMetadataVar, "npmMD", false, "Only download NPM Metadata")
 	flag.Parse()
 	return flags
 }

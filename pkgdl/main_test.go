@@ -36,7 +36,7 @@ func TestVerifyApiKey(t *testing.T) {
 func TestGetNPMMetadata(t *testing.T) {
 	t.Log("Testing NPM Metadata")
 	creds := userForTesting()
-	npm.GetNPMMetadata(creds, creds.URL+"/api/npm/"+creds.Repository+"/", "49", "005-http-antao", creds.DlLocation, "")
+	npm.GetNPMMetadata(creds, creds.URL+"/api/npm/"+flags.RepoVar+"/", "49", "005-http-antao", creds.DlLocation, "")
 }
 
 func TestGenerateDownloadJSON(t *testing.T) {
@@ -53,7 +53,7 @@ func TestGenerateDownloadJSON(t *testing.T) {
 func TestCheckTypeAndRepoParams(t *testing.T) {
 	t.Log("Testing checkTypeAndRepoParams")
 	creds := userForTesting()
-	checkTypeAndRepoParams(creds)
+	checkTypeAndRepoParams(creds, "blah")
 }
 
 func userForTesting() auth.Creds {
@@ -67,7 +67,6 @@ func userForTesting() auth.Creds {
 		Username:   "admin",
 		Apikey:     "password",
 		DlLocation: string(usr.HomeDir + "/testing"),
-		Repository: "npm-remote",
 	}
 	return data
 }
