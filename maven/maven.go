@@ -24,7 +24,7 @@ func GetMavenHrefs(url string, base string, MavenWorkerQueue *list.List) string 
 	helpers.Check(err, false, "HTTP GET error", helpers.Trace())
 	defer resp.Body.Close()
 
-	//fmt.Println(resp) //output from HTML download
+	log.Trace("trace resp", resp) //output from HTML download
 
 	z := html.NewTokenizer(resp.Body)
 	for {
@@ -37,14 +37,15 @@ func GetMavenHrefs(url string, base string, MavenWorkerQueue *list.List) string 
 			return ""
 		case tt == html.StartTagToken:
 			t := z.Token()
+			log.Trace("t:", t)
 			isAnchor := t.Data == "a"
 			if isAnchor {
 
 				// recursive look
 				for _, a := range t.Attr {
 					if a.Key == "href" && (strings.HasSuffix(a.Val, "/")) {
-
 						strip := strings.TrimPrefix(a.Val, ":")
+						log.Debug("strip:", url+strip)
 						GetMavenHrefs(url+strip, base, MavenWorkerQueue)
 						break
 					}
@@ -59,6 +60,7 @@ func checkMaven(t html.Token, url string, base string, MavenWorkerQueue *list.Li
 	//need to consider downloading pom.xml too
 	if strings.Contains(t.String(), ".jar") || strings.Contains(t.String(), ".pom") {
 		for _, a := range t.Attr {
+			//log.Debug(a.Val, a.Key)
 			if a.Key == "href" && (strings.HasSuffix(a.Val, ".jar")) || a.Key == "href" && (strings.HasSuffix(a.Val, ".pom")) {
 				hrefraw := url + a.Val
 				href := strings.TrimPrefix(hrefraw, base)

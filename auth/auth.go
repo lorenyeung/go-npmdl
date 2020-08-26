@@ -164,15 +164,23 @@ func StorageCheck(creds Creds, warning float64, threshold float64) {
 	helpers.Check(err, false, "check failed", helpers.Trace())
 	log.Debug("free:", storageData.StorageSummary.FileStoreSummary.FreeSpace, " used:", storageData.StorageSummary.FileStoreSummary.UsedSpace)
 	used := strings.Split(storageData.StorageSummary.FileStoreSummary.UsedSpace, "(")
-	usedpc := strings.TrimRight(used[1], "%)")
-	i, err := strconv.ParseFloat(usedpc, 32)
+	log.Debug("useage results:", used)
+	if len(used) > 2 {
+		usedpc := strings.TrimRight(used[1], "%)")
+		i, err := strconv.ParseFloat(usedpc, 32)
+		if err != nil {
+			log.Warn(err)
+			return
+		}
+		if i >= threshold {
+			log.Panic("Summary reporting that disk hit threshold ", warning, "% usage, (", used[1], " killing all downloads")
+			os.Exit(1)
 
-	if i >= threshold {
-		log.Panic("Summary reporting that disk hit threshold ", warning, "% usage, (", used[1], " killing all downloads")
-		os.Exit(1)
-
-	} else if i >= warning {
-		log.Warn("Summary reporting that disk is over warning ", warning, "% usage, (", used[1], " proceed with caution")
+		} else if i >= warning {
+			log.Warn("Summary reporting that disk is over warning ", warning, "% usage, (", used[1], " proceed with caution")
+		}
+	} else {
+		log.Warn("storage check returned:", used)
 	}
 
 }
