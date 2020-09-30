@@ -44,8 +44,7 @@ func GetNPMMetadata(creds auth.Creds, URL, packageIndex, packageName, configPath
 	}
 	for i, j := range metadata.Versions {
 
-		//TODO can be a problem if you set override base url and the tarball URL no longer matches correctly with creds.URL due to overwrite-base-url header
-		s := strings.Split(j.Dist.Tarball, URL)
+		s := strings.Split(j.Dist.Tarball, "api/npm/"+flags.RepoVar)
 		//fmt.Println(len(s), "length of s") //413 error
 		if len(s) > 1 && s[1] != "" {
 			_, headStatusCode, _ := auth.GetRestAPI("HEAD", true, creds.URL+"/"+flags.RepoVar+"-cache/"+s[1], creds.Username, creds.Apikey, "", nil, 1)
