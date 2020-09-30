@@ -68,7 +68,10 @@ func GetDockerImages(artURL string, artUser string, artApikey string, dockerRepo
 			randomSearchMap[dockerSearchStr] = "taken"
 			if !random {
 				log.Debug("Docker ordered search key:", dockerSearchStr)
-				results, _ := cli.ImageSearch(ctx, dockerSearchStr, imageSearch)
+				results, err := cli.ImageSearch(ctx, dockerSearchStr, imageSearch)
+				if err != nil {
+					log.Error("Docker image search error:", err)
+				}
 				dockerSearch(dockerSearchStr, results, artURL, artUser, artApikey, dockerRepo, dockerWorkerQueue, workerSleepVar)
 			}
 		}

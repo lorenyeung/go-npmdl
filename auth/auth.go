@@ -57,7 +57,7 @@ func VerifyAPIKey(urlInput, userName, apiKey string) bool {
 		log.Debug("finished VerifyAPIkey request. Credentials are good to go.")
 		return true
 	}
-	log.Debug("finished VerifyAPIkey request:", string(data))
+	log.Warn("Received unexpected response:", string(data), " against ", urlInput+"/api/system/ping. Double check your URL and credentials.")
 	return false
 }
 
