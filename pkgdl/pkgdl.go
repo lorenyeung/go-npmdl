@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"container/list"
 	"encoding/json"
 	"flag"
@@ -13,6 +14,7 @@ import (
 	"go-pkgdl/npm"
 	"go-pkgdl/pypi"
 	"go-pkgdl/rpm"
+	"math/rand"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
@@ -50,6 +52,7 @@ func main() {
 	//TODO clean up downloads dir beforehand
 
 	masterKey := auth.VerifyMasterKey(configPath + "master.key")
+
 	creds := auth.GetDownloadJSON(configPath+"download.json", masterKey)
 
 	if flags.UsernameVar == "" {
@@ -61,6 +64,28 @@ func main() {
 	if flags.URLVar == "" {
 		flags.URLVar = creds.URL
 	}
+	credsFilelength := 0
+	credsFileHash := make(map[int][]string)
+	if flags.CredsFileVar != "" {
+		credsFile, err := os.Open(flags.CredsFileVar)
+		if err != nil {
+			log.Error("Invalid creds file:", err)
+			os.Exit(0)
+		}
+		defer credsFile.Close()
+		scanner := bufio.NewScanner(credsFile)
+
+		for scanner.Scan() {
+			credsFileCreds := strings.Split(scanner.Text(), " ")
+			credsFileHash[credsFilelength] = credsFileCreds
+			credsFilelength = credsFilelength + 1
+		}
+	}
+	flags.UsernameVar = credsFileHash[0][0]
+	flags.ApikeyVar = credsFileHash[0][1]
+	log.Info("Number of creds in file:", credsFilelength)
+	log.Info("choose first one first:", flags.UsernameVar)
+	//os.Exit(0)
 
 	if (flags.RepoVar == "") && flags.ResetVar != true && flags.ValuesVar != true {
 		log.Error("Must specify -repo <Repository>")
@@ -114,6 +139,7 @@ func main() {
 	case "docker":
 		log.Warn("Work in progress, only works against Docker Hub")
 		go func() {
+			log.Info("testing if it goes in here multiple times case repotype") //it does not
 			docker.GetDockerImages(creds.URL, creds.Username, creds.Apikey, flags.RepoVar, extractedURL, extractedURLStripped, 1, "", workQueue, flags.RandomVar, flags.WorkerSleepVar)
 		}()
 
@@ -130,6 +156,7 @@ func main() {
 		}()
 
 	case "npm":
+		log.Info("testing if it goes in here multiple times case repotype")
 		npm.GetNPMList(configPath, workQueue)
 
 	case "pypi":
@@ -171,7 +198,17 @@ func main() {
 					wg.Done()
 				}
 				log.Debug("worker ", i, " starting job")
+
+				if flags.CredsFileVar != "" {
+					//pick random user and password from list
+					numCreds := len(credsFileHash)
+					rand.Seed(time.Now().UnixNano())
+					randCredIndex := rand.Intn(numCreds)
+					creds.Username = credsFileHash[randCredIndex][0]
+					creds.Apikey = credsFileHash[randCredIndex][1]
+				}
 				switch repotype {
+
 				case "debian":
 					md := s.(debian.Metadata)
 					standardDownload(creds, md.URL, md.File, configPath, pkgRepoDlFolder, flags.RepoVar)

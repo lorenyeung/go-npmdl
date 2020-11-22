@@ -1,8 +1,10 @@
 package helpers
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"runtime"
 	"strings"
@@ -102,10 +104,30 @@ func PrintDownloadPercent(done chan int64, path string, total int64) {
 
 //Flags struct
 type Flags struct {
-	WorkersVar, WorkerSleepVar, DuCheckVar               int
-	StorageWarningVar, StorageThresholdVar               float64
-	UsernameVar, ApikeyVar, URLVar, RepoVar, LogLevelVar string
-	ResetVar, ValuesVar, RandomVar, NpmMetadataVar       bool
+	WorkersVar, WorkerSleepVar, DuCheckVar                             int
+	StorageWarningVar, StorageThresholdVar                             float64
+	UsernameVar, ApikeyVar, URLVar, RepoVar, LogLevelVar, CredsFileVar string
+	ResetVar, ValuesVar, RandomVar, NpmMetadataVar                     bool
+}
+
+//LineCounter counts  how many lines are in a file
+func LineCounter(r io.Reader) (int, error) {
+	buf := make([]byte, 32*1024)
+	count := 0
+	lineSep := []byte{'\n'}
+
+	for {
+		c, err := r.Read(buf)
+		count += bytes.Count(buf[:c], lineSep)
+
+		switch {
+		case err == io.EOF:
+			return count, nil
+
+		case err != nil:
+			return count, err
+		}
+	}
 }
 
 //SetFlags function
@@ -125,6 +147,7 @@ func SetFlags() Flags {
 	flag.BoolVar(&flags.ValuesVar, "values", false, "Output values")
 	flag.BoolVar(&flags.RandomVar, "random", false, "Attempt to pull packages in random queue order")
 	flag.BoolVar(&flags.NpmMetadataVar, "npmMD", false, "Only download NPM Metadata")
+	flag.StringVar(&flags.CredsFileVar, "credsfile", "", "File with creds. If there is more than one, it will pick randomly per request. Use whitespace to separate out user and password")
 	flag.Parse()
 	return flags
 }
