@@ -80,11 +80,12 @@ func main() {
 			credsFileHash[credsFilelength] = credsFileCreds
 			credsFilelength = credsFilelength + 1
 		}
+
+		flags.UsernameVar = credsFileHash[0][0]
+		flags.ApikeyVar = credsFileHash[0][1]
+		log.Info("Number of creds in file:", credsFilelength)
+		log.Info("choose first one first:", flags.UsernameVar)
 	}
-	flags.UsernameVar = credsFileHash[0][0]
-	flags.ApikeyVar = credsFileHash[0][1]
-	log.Info("Number of creds in file:", credsFilelength)
-	log.Info("choose first one first:", flags.UsernameVar)
 	//os.Exit(0)
 
 	if (flags.RepoVar == "") && flags.ResetVar != true && flags.ValuesVar != true {
