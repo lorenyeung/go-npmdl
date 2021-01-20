@@ -6,7 +6,9 @@ import (
 	"go-pkgdl/helpers"
 	"net/http"
 	"strings"
+	"time"
 
+	"github.com/prometheus/common/log"
 	"golang.org/x/net/html"
 )
 
@@ -17,7 +19,7 @@ type Metadata struct {
 }
 
 //GetPypiHrefs parse PyPi for debian files
-func GetPypiHrefs(registry string, registryBase string, url string, pypiWorkerQueue *list.List) string {
+func GetPypiHrefs(registry string, registryBase string, url string, flags helpers.Flags, pypiWorkerQueue *list.List) string {
 	resp, err := http.Get(registry)
 	helpers.Check(err, true, "HTTP GET error", helpers.Trace())
 	defer resp.Body.Close()
@@ -39,17 +41,17 @@ func GetPypiHrefs(registry string, registryBase string, url string, pypiWorkerQu
 				// recursive look
 				for _, a := range t.Attr {
 					if a.Key == "href" && (strings.HasSuffix(a.Val, "/")) {
-						GetPypiHrefs(registryBase+a.Val, registryBase, url, pypiWorkerQueue)
+						GetPypiHrefs(registryBase+a.Val, registryBase, url, flags, pypiWorkerQueue)
 						break
 					}
 				}
-				checkPypi(t, registry, registryBase, url, pypiWorkerQueue)
+				checkPypi(t, registry, registryBase, url, flags, pypiWorkerQueue)
 			}
 		}
 	}
 }
 
-func checkPypi(t html.Token, registry string, registryBase string, url string, pypiWorkerQueue *list.List) {
+func checkPypi(t html.Token, registry string, registryBase string, url string, flags helpers.Flags, pypiWorkerQueue *list.List) {
 	if strings.Contains(t.String(), "#sha256") {
 		for _, a := range t.Attr {
 
@@ -58,6 +60,11 @@ func checkPypi(t html.Token, registry string, registryBase string, url string, p
 				hrefraw := parts[0]
 				href := strings.TrimPrefix(hrefraw, url)
 				file := strings.Split(parts[0], "/")
+
+				if pypiWorkerQueue.Len() > flags.SleepQueueMaxVar {
+					log.Debug("Docker worker queue is at ", pypiWorkerQueue.Len(), ", sleeping for ", flags.WorkerSleepVar, " seconds...")
+					time.Sleep(time.Duration(flags.WorkerSleepVar) * time.Second)
+				}
 
 				fmt.Println("Queuing download", href, pypiWorkerQueue.Len())
 				//add pypi metadata to queue

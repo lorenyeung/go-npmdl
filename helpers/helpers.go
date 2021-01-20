@@ -104,7 +104,7 @@ func PrintDownloadPercent(done chan int64, path string, total int64) {
 
 //Flags struct
 type Flags struct {
-	WorkersVar, WorkerSleepVar, DuCheckVar                             int
+	WorkersVar, WorkerSleepVar, DuCheckVar, SleepQueueMaxVar           int
 	StorageWarningVar, StorageThresholdVar                             float64
 	UsernameVar, ApikeyVar, URLVar, RepoVar, LogLevelVar, CredsFileVar string
 	ResetVar, ValuesVar, RandomVar, NpmMetadataVar                     bool
@@ -135,6 +135,7 @@ func SetFlags() Flags {
 	var flags Flags
 	flag.StringVar(&flags.LogLevelVar, "log", "INFO", "Order of Severity: TRACE, DEBUG, INFO, WARN, ERROR, FATAL, PANIC")
 	flag.IntVar(&flags.WorkersVar, "workers", 50, "Number of workers")
+	flag.IntVar(&flags.SleepQueueMaxVar, "queuemax", 75, "Max queued size before sleeping")
 	flag.IntVar(&flags.WorkerSleepVar, "workersleep", 5, "Worker sleep period in seconds")
 	flag.IntVar(&flags.DuCheckVar, "ducheck", 5, "Disk Usage check in minutes")
 	flag.Float64Var(&flags.StorageWarningVar, "duwarn", 70, "Set Disk usage warning in %")
