@@ -162,7 +162,7 @@ func main() {
 
 	case "pypi":
 		go func() {
-			pypi.GetPypiHrefs(pypiRegistryURL+"/"+pypiRepoSuffix+"/", pypiRegistryURL, extractedURLStripped, workQueue)
+			pypi.GetPypiHrefs(pypiRegistryURL+"/"+pypiRepoSuffix+"/", pypiRegistryURL, extractedURLStripped, flags, workQueue)
 		}()
 
 	case "rpm":
