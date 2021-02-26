@@ -156,6 +156,7 @@ func StorageCheck(creds Creds, warning float64, threshold float64) {
 		return
 	}
 	//may need to trigger async calculation for newer versions
+	//TODO maybe disable this for large instances.
 	log.Debug("Triggering async POST to update summary page")
 	GetRestAPI("POST", true, creds.URL+"/api/storageinfo/calculate", creds.Username, creds.Apikey, "", nil, 1)
 

@@ -1,13 +1,13 @@
 package generic
 
 import (
+	"bytes"
 	"container/list"
 	"fmt"
 	"go-pkgdl/auth"
 	"go-pkgdl/helpers"
 	"io/ioutil"
 	"math/rand"
-	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -24,13 +24,13 @@ type Metadata struct {
 }
 
 //GetGenericHrefs parse hrefs for Generic files
-func GetGenericHrefs(url string, base string, GenericWorkerQueue *list.List, workerSleepVar int) string {
+func GetGenericHrefs(url string, base string, GenericWorkerQueue *list.List, flags helpers.Flags) string {
 	if url == "" {
 		//must be a local repo, send to generic file generator instead
 		for {
 			if GenericWorkerQueue.Len() > 10000 {
-				log.Debug("Generic worker queue is at ", GenericWorkerQueue.Len(), ", sleeping for ", workerSleepVar, " seconds...")
-				time.Sleep(time.Duration(workerSleepVar) * time.Second)
+				log.Debug("Generic worker queue is at ", GenericWorkerQueue.Len(), ", sleeping for ", flags.WorkerSleepVar, " seconds...")
+				time.Sleep(time.Duration(flags.WorkerSleepVar) * time.Second)
 			}
 			randomString := RandStringBytesMaskImprSrcSB(10)
 			var GenericMd Metadata
@@ -40,14 +40,21 @@ func GetGenericHrefs(url string, base string, GenericWorkerQueue *list.List, wor
 
 		}
 	} else {
-		resp, err := http.Get(url)
+		needAuth := false
+		if flags.UpstreamUsernameVar != "" {
+			needAuth = true
+		}
+		respdata, _, _ := auth.GetRestAPI("GET", needAuth, url, flags.UpstreamUsernameVar, flags.UpstreamApikeyVar, "", nil, 2)
+		//resp, err := http.Get(url)
 		// this needs to be threaded better..
-		helpers.Check(err, false, "HTTP GET error", helpers.Trace())
-		defer resp.Body.Close()
+		//helpers.Check(err, false, "HTTP GET error", helpers.Trace())
+		//defer resp.Body.Close()
+
+		resp := ioutil.NopCloser(bytes.NewReader(respdata))
 
 		log.Debug(resp) //output from HTML download
 
-		z := html.NewTokenizer(resp.Body)
+		z := html.NewTokenizer(resp)
 		for {
 
 			tt := z.Next()
@@ -66,7 +73,7 @@ func GetGenericHrefs(url string, base string, GenericWorkerQueue *list.List, wor
 						if a.Key == "href" && (strings.HasSuffix(a.Val, "/")) {
 
 							strip := strings.TrimPrefix(a.Val, ":")
-							GetGenericHrefs(url+strip, base, GenericWorkerQueue, workerSleepVar)
+							GetGenericHrefs(url+strip, base, GenericWorkerQueue, flags)
 							break
 						}
 					}
@@ -79,9 +86,11 @@ func GetGenericHrefs(url string, base string, GenericWorkerQueue *list.List, wor
 
 func checkGeneric(t html.Token, url string, base string, GenericWorkerQueue *list.List) {
 	//need to consider downloading pom.xml too TODO fix for generic
-	if strings.Contains(t.String(), ".jar") || strings.Contains(t.String(), ".pom") {
+
+	if strings.Contains(t.String(), ".json") || strings.Contains(t.String(), "sha256_") {
+		log.Debug("layers:", t.String())
 		for _, a := range t.Attr {
-			if a.Key == "href" && (strings.HasSuffix(a.Val, ".jar")) || a.Key == "href" && (strings.HasSuffix(a.Val, ".pom")) {
+			if a.Key == "href" && (strings.HasSuffix(a.Val, ".json")) || a.Key == "href" && (strings.HasPrefix(a.Val, "sha256_")) {
 				hrefraw := url + a.Val
 				href := strings.TrimPrefix(hrefraw, base)
 

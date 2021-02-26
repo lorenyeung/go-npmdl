@@ -138,7 +138,7 @@ func DlDockerLayers(creds auth.Creds, md Metadata, repo string, workerNum int) {
 	log.Trace("Worker ", workerNum, " Manifest data:", string(manifest), md.Image, md.Tag)
 	log.Debug("Worker ", workerNum, " Manifest recieved data:", headers, manifestData.Config.Digest, manifestData.Config.MediaType, manifestData.SchemaVersion)
 	if manifestData.SchemaVersion != 2 {
-		log.Warn("Worker ", workerNum, " encountered schema version ", manifestData.SchemaVersion, " skipping download")
+		log.Warn("Worker ", workerNum, " encountered schema version ", manifestData.SchemaVersion, " for manifest ", md.Image+":"+md.Tag, " skipping download")
 		return
 	}
 	log.Debug("Worker ", workerNum, " Getting manifest via metadata:", md.ManifestURLAPI)

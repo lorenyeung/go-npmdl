@@ -131,6 +131,9 @@ func main() {
 	//case switch for different package types
 	workQueue := list.New()
 	var extractedURLStripped = strings.TrimSuffix(extractedURL, "/")
+	if !strings.HasSuffix(extractedURL, "/") {
+		extractedURL = extractedURL + "/"
+	}
 	switch repotype {
 	case "debian":
 		go func() {
@@ -147,7 +150,9 @@ func main() {
 	case "generic":
 		log.Warn("Work in progress")
 		go func() {
-			generic.GetGenericHrefs(extractedURL, extractedURLStripped, workQueue, flags.WorkerSleepVar)
+			log.Debug("Extraced URL:", extractedURL, " stripped:", extractedURLStripped)
+			//TODO: if url does not end in /, it messes up
+			generic.GetGenericHrefs(extractedURL, extractedURLStripped, workQueue, flags)
 
 		}()
 
@@ -221,7 +226,8 @@ func main() {
 
 				case "generic":
 					md := s.(generic.Metadata)
-					generic.CreateAndUploadFile(creds, md, flags, configPath, pkgRepoDlFolder, i)
+					standardDownload(creds, md.URL, md.File, configPath, pkgRepoDlFolder, flags.RepoVar)
+					//generic.CreateAndUploadFile(creds, md, flags, configPath, pkgRepoDlFolder, i)
 
 				case "maven":
 					md := s.(maven.Metadata)
@@ -278,7 +284,7 @@ func standardDownload(creds auth.Creds, dlURL string, file string, configPath st
 		return
 	}
 
-	log.Info("Downloading", creds.URL+"/"+repoVar+dlURL)
+	log.Info("Downloading ", creds.URL+"/"+repoVar+dlURL)
 	auth.GetRestAPI("GET", true, creds.URL+"/"+repoVar+dlURL, creds.Username, creds.Apikey, configPath+pkgRepoDlFolder+"/"+file, nil, 1)
 	os.Remove(configPath + pkgRepoDlFolder + "/" + file)
 }

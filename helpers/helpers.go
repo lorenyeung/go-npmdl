@@ -104,10 +104,10 @@ func PrintDownloadPercent(done chan int64, path string, total int64) {
 
 //Flags struct
 type Flags struct {
-	WorkersVar, WorkerSleepVar, DuCheckVar, SleepQueueMaxVar           int
-	StorageWarningVar, StorageThresholdVar                             float64
-	UsernameVar, ApikeyVar, URLVar, RepoVar, LogLevelVar, CredsFileVar string
-	ResetVar, ValuesVar, RandomVar, NpmMetadataVar                     bool
+	WorkersVar, WorkerSleepVar, DuCheckVar, SleepQueueMaxVar                                                   int
+	StorageWarningVar, StorageThresholdVar                                                                     float64
+	UsernameVar, ApikeyVar, URLVar, RepoVar, LogLevelVar, CredsFileVar, UpstreamUsernameVar, UpstreamApikeyVar string
+	ResetVar, ValuesVar, RandomVar, NpmMetadataVar                                                             bool
 }
 
 //LineCounter counts  how many lines are in a file
@@ -142,6 +142,8 @@ func SetFlags() Flags {
 	flag.Float64Var(&flags.StorageThresholdVar, "duthreshold", 85, "Set Disk usage threshold in %")
 	flag.StringVar(&flags.UsernameVar, "user", "", "Username")
 	flag.StringVar(&flags.ApikeyVar, "apikey", "", "API key or password")
+	flag.StringVar(&flags.UpstreamUsernameVar, "uuser", "", "Upstream Username")
+	flag.StringVar(&flags.UpstreamApikeyVar, "uapikey", "", "Upstream API key or password")
 	flag.StringVar(&flags.URLVar, "url", "", "Binary Manager URL")
 	flag.StringVar(&flags.RepoVar, "repo", "", "Download Repository")
 	flag.BoolVar(&flags.ResetVar, "reset", false, "Reset creds file")
