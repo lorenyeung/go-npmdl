@@ -5,6 +5,7 @@ import (
 	"container/list"
 	"encoding/json"
 	"flag"
+	"fmt"
 	"go-pkgdl/auth"
 	"go-pkgdl/debian"
 	"go-pkgdl/docker"
@@ -26,10 +27,23 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func main() {
+var gitCommit string
+var version string
 
+func printVersion() {
+	fmt.Println("Current build version:", gitCommit, "Current Version:", version)
+}
+
+func main() {
+	versionFlag := flag.Bool("v", false, "Print the current version and exit")
 	flags := helpers.SetFlags()
 	helpers.SetLogger(flags.LogLevelVar)
+
+	switch {
+	case *versionFlag:
+		printVersion()
+		return
+	}
 
 	supportedTypes := [7]string{"debian", "docker", "generic", "maven", "npm", "pypi", "rpm"}
 	usr, err := user.Current()
@@ -134,6 +148,9 @@ func main() {
 	if !strings.HasSuffix(extractedURL, "/") {
 		extractedURL = extractedURL + "/"
 	}
+	if flags.ForceTypeVar != "" {
+		repotype = flags.ForceTypeVar
+	}
 	switch repotype {
 	case "debian":
 		go func() {
@@ -152,7 +169,7 @@ func main() {
 		go func() {
 			log.Debug("Extraced URL:", extractedURL, " stripped:", extractedURLStripped)
 			//TODO: if url does not end in /, it messes up
-			generic.GetGenericHrefs(extractedURL, extractedURLStripped, workQueue, flags)
+			generic.GetGenericHrefs(extractedURL, extractedURLStripped, workQueue, flags.RepoVar, flags)
 
 		}()
 
@@ -222,11 +239,11 @@ func main() {
 
 				case "docker":
 					md := s.(docker.Metadata)
-					docker.DlDockerLayers(creds, md, flags.RepoVar, i)
+					docker.DlDockerLayers(creds, md, flags.RepoVar, i, false)
 
 				case "generic":
 					md := s.(generic.Metadata)
-					standardDownload(creds, md.URL, md.File, configPath, pkgRepoDlFolder, flags.RepoVar)
+					generic.GenericDownload(creds, md, configPath, pkgRepoDlFolder, flags.RepoVar, i)
 					//generic.CreateAndUploadFile(creds, md, flags, configPath, pkgRepoDlFolder, i)
 
 				case "maven":
@@ -280,7 +297,7 @@ func main() {
 func standardDownload(creds auth.Creds, dlURL string, file string, configPath string, pkgRepoDlFolder string, repoVar string) {
 	_, headStatusCode, _ := auth.GetRestAPI("HEAD", true, creds.URL+"/"+repoVar+"-cache/"+dlURL, creds.Username, creds.Apikey, "", nil, 1)
 	if headStatusCode == 200 {
-		log.Debug("skipping, got 200 on HEAD request for %s\n", creds.URL+"/"+repoVar+"-cache/"+dlURL)
+		log.Debug("skipping, got 200 on HEAD request for ", creds.URL+"/"+repoVar+"-cache/"+dlURL)
 		return
 	}
 

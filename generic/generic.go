@@ -5,6 +5,7 @@ import (
 	"container/list"
 	"fmt"
 	"go-pkgdl/auth"
+	"go-pkgdl/docker"
 	"go-pkgdl/helpers"
 	"io/ioutil"
 	"math/rand"
@@ -19,12 +20,16 @@ import (
 
 //Metadata struct of Generic object
 type Metadata struct {
-	URL  string
-	File string
+	URL             string
+	File            string
+	ManifestURLAPI  string
+	ManifestURLFile string
+	Image           string
+	Tag             string
 }
 
 //GetGenericHrefs parse hrefs for Generic files
-func GetGenericHrefs(url string, base string, GenericWorkerQueue *list.List, flags helpers.Flags) string {
+func GetGenericHrefs(url string, base string, GenericWorkerQueue *list.List, genericRepo string, flags helpers.Flags) string {
 	if url == "" {
 		//must be a local repo, send to generic file generator instead
 		for {
@@ -73,21 +78,49 @@ func GetGenericHrefs(url string, base string, GenericWorkerQueue *list.List, fla
 						if a.Key == "href" && (strings.HasSuffix(a.Val, "/")) {
 
 							strip := strings.TrimPrefix(a.Val, ":")
-							GetGenericHrefs(url+strip, base, GenericWorkerQueue, flags)
+							GetGenericHrefs(url+strip, base, GenericWorkerQueue, genericRepo, flags)
 							break
 						}
 					}
-					checkGeneric(t, url, base, GenericWorkerQueue)
+					checkGeneric(t, url, base, GenericWorkerQueue, genericRepo, flags)
 				}
 			}
 		}
 	}
 }
 
-func checkGeneric(t html.Token, url string, base string, GenericWorkerQueue *list.List) {
+func checkGeneric(t html.Token, url string, base string, GenericWorkerQueue *list.List, genericRepo string, flags helpers.Flags) {
 	//need to consider downloading pom.xml too TODO fix for generic
+	if strings.Contains(t.String(), "manifest.json") {
+		for _, a := range t.Attr {
+			if a.Key == "href" && (strings.HasSuffix(a.Val, ".json")) {
+				hrefraw := url + a.Val
+				href := strings.TrimPrefix(hrefraw, base)
 
-	if strings.Contains(t.String(), ".json") || strings.Contains(t.String(), "sha256_") {
+				log.Info("queuing download ", href, a.Val, GenericWorkerQueue.Len())
+
+				dockerString := strings.Split(href, "/")
+
+				var GenericMd Metadata
+				GenericMd.Image = dockerString[1]
+				GenericMd.Tag = dockerString[2]
+				//log.Error(dockerString)
+				//GenericMd.ManifestURLAPI = flags.URLVar + "/api/docker/" + genericRepo + "/v2/" + GenericMd.Image + "/manifests/" + GenericMd.Tag
+				GenericMd.ManifestURLAPI = flags.URLVar + "/" + genericRepo + "/" + GenericMd.Image + "/" + GenericMd.Tag + "/manifest.json"
+				GenericMd.ManifestURLFile = flags.URLVar + "/" + genericRepo + "/" + GenericMd.Image + "/" + GenericMd.Tag + "/manifest.json"
+				log.Info("Docker Queue pushing into queue:", GenericMd.ManifestURLFile)
+				GenericWorkerQueue.PushBack(GenericMd)
+
+				for GenericWorkerQueue.Len() > 75 {
+					log.Debug("Generic worker queue is at ", GenericWorkerQueue.Len(), ", sleeping for ", flags.WorkerSleepVar, " seconds...")
+					time.Sleep(time.Duration(flags.WorkerSleepVar) * time.Second)
+				}
+				log.Trace("Queue at:", GenericWorkerQueue.Len(), ", resuming generic worker queue")
+				break
+			}
+		}
+
+	} else if strings.Contains(t.String(), ".json") {
 		log.Debug("layers:", t.String())
 		for _, a := range t.Attr {
 			if a.Key == "href" && (strings.HasSuffix(a.Val, ".json")) || a.Key == "href" && (strings.HasPrefix(a.Val, "sha256_")) {
@@ -149,4 +182,26 @@ func RandStringBytesMaskImprSrcSB(n int) string {
 	}
 
 	return sb.String()
+}
+
+func GenericDownload(creds auth.Creds, md Metadata, configPath string, pkgRepoDlFolder string, repoVar string, i int) {
+
+	if md.ManifestURLAPI != "" {
+		var dockerMd docker.Metadata
+		dockerMd.Image = md.Image
+		dockerMd.ManifestURLAPI = md.ManifestURLAPI
+		dockerMd.ManifestURLFile = md.ManifestURLFile
+		dockerMd.Tag = md.Tag
+		docker.DlDockerLayers(creds, dockerMd, repoVar, i, true)
+	}
+
+	_, headStatusCode, _ := auth.GetRestAPI("HEAD", true, creds.URL+"/"+repoVar+"-cache/"+md.URL, creds.Username, creds.Apikey, "", nil, 1)
+	if headStatusCode == 200 {
+		log.Debug("skipping, got 200 on HEAD request for ", creds.URL+"/"+repoVar+"-cache/"+md.URL)
+		return
+	}
+
+	log.Info("Downloading ", creds.URL+"/"+repoVar+md.URL)
+	auth.GetRestAPI("GET", true, creds.URL+"/"+repoVar+md.URL, creds.Username, creds.Apikey, configPath+pkgRepoDlFolder+"/"+md.File, nil, 1)
+	os.Remove(configPath + pkgRepoDlFolder + "/" + md.File)
 }

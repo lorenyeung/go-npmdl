@@ -121,7 +121,7 @@ func dockerSearch(search string, results []registry.SearchResult, artURL string,
 }
 
 //DlDockerLayers download docker layers
-func DlDockerLayers(creds auth.Creds, md Metadata, repo string, workerNum int) {
+func DlDockerLayers(creds auth.Creds, md Metadata, repo string, workerNum int, generic bool) {
 	m := map[string]string{
 		"Accept": "application/vnd.docker.distribution.manifest.v2+json",
 	}
@@ -160,8 +160,21 @@ func DlDockerLayers(creds auth.Creds, md Metadata, repo string, workerNum int) {
 			continue
 		}
 		log.Debug("Worker ", workerNum, " Downloading blob:", manifestData.FsLayers[x].BlobSum)
-		blobDownload := creds.URL + "/api/docker/" + repo + "/v2/" + md.Image + "/blobs/" + manifestData.FsLayers[x].BlobSum
+		blobDownload := ""
+		if generic {
+			blobDownload = creds.URL + "/" + repo + "/" + md.Image + "/" + md.Tag + "/" + strings.Replace(manifestData.FsLayers[x].BlobSum, ":", "__", -1)
+			sha256, _, _ := auth.GetRestAPI("GET", true, creds.URL+"/"+repo+"-cache/"+md.Image+"/"+md.Tag+"/manifest.json.sha256", creds.Username, creds.Apikey, "", nil, 1)
+			auth.GetRestAPI("PUT", true, creds.URL+"/api/storage/"+repo+"-cache/"+md.Image+"/"+md.Tag+"/manifest.json?properties=docker.manifest.digest=sha256:"+string(sha256)+";sha256="+string(sha256), creds.Username, creds.Apikey, "", nil, 1)
+		} else {
+			blobDownload = creds.URL + "/api/docker/" + repo + "/v2/" + md.Image + "/blobs/" + manifestData.FsLayers[x].BlobSum
+		}
 		auth.GetRestAPI("GET", true, blobDownload, creds.Username, creds.Apikey, "", nil, 1)
+		if generic {
+			auth.GetRestAPI("PUT", true, creds.URL+"/api/storage/"+repo+"-cache/"+md.Image+"/"+md.Tag+"/"+strings.Replace(manifestData.FsLayers[x].BlobSum, ":", "__", -1)+"?properties=sha256="+strings.Replace(manifestData.FsLayers[x].BlobSum, "sha256:", "", -1), creds.Username, creds.Apikey, "", nil, 1)
+			auth.GetRestAPI("GET", true, creds.URL+"/api/docker/"+repo+"/v2/"+md.Image+"/blobs/"+manifestData.FsLayers[x].BlobSum, creds.Username, creds.Apikey, "", nil, 1)
+
+		}
+		//TODO maybe some error code if the layers aren't fetching
 		log.Debug("Worker ", workerNum, " Finished Getting blob:", manifestData.FsLayers[x].BlobSum)
 	}
 	log.Info("Worker ", workerNum, " Finished downloading image:", md.Image, ":", md.Tag, ", skipped ", skippedLayers, "/", len(manifestData.FsLayers), " layers as they already existed")

@@ -4,6 +4,10 @@
 Download a bunch of packages and cache them in a Binary Manager's remote repository
 
 ## Installation
+Standalone Binary
+See the new releases section :) 
+
+Source code method
 Find your go home (`go env`) 
 
 then install under `$GO_HOME/src` (do not create another folder)

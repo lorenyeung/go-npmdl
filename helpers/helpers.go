@@ -104,10 +104,10 @@ func PrintDownloadPercent(done chan int64, path string, total int64) {
 
 //Flags struct
 type Flags struct {
-	WorkersVar, WorkerSleepVar, DuCheckVar, SleepQueueMaxVar                                                   int
-	StorageWarningVar, StorageThresholdVar                                                                     float64
-	UsernameVar, ApikeyVar, URLVar, RepoVar, LogLevelVar, CredsFileVar, UpstreamUsernameVar, UpstreamApikeyVar string
-	ResetVar, ValuesVar, RandomVar, NpmMetadataVar                                                             bool
+	WorkersVar, WorkerSleepVar, DuCheckVar, SleepQueueMaxVar                                                                 int
+	StorageWarningVar, StorageThresholdVar                                                                                   float64
+	UsernameVar, ApikeyVar, URLVar, RepoVar, LogLevelVar, CredsFileVar, UpstreamUsernameVar, UpstreamApikeyVar, ForceTypeVar string
+	ResetVar, ValuesVar, RandomVar, NpmMetadataVar                                                                           bool
 }
 
 //LineCounter counts  how many lines are in a file
@@ -151,6 +151,7 @@ func SetFlags() Flags {
 	flag.BoolVar(&flags.RandomVar, "random", false, "Attempt to pull packages in random queue order")
 	flag.BoolVar(&flags.NpmMetadataVar, "npmMD", false, "Only download NPM Metadata")
 	flag.StringVar(&flags.CredsFileVar, "credsfile", "", "File with creds. If there is more than one, it will pick randomly per request. Use whitespace to separate out user and password")
+	flag.StringVar(&flags.ForceTypeVar, "forcerepotype", "", "force repo type rather than get from repository")
 	flag.Parse()
 	return flags
 }
