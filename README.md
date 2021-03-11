@@ -7,7 +7,7 @@ Download a bunch of packages and cache them in a Binary Manager's remote reposit
 Standalone Binary
 See the new releases section :) 
 
-Those can be run with ./pkgdl-<DISTRO>-<ARCH>
+Those can be run with `./pkgdl-<DISTRO>-<ARCH>`
 
 Source code method
 Find your go home (`go env`) 
@@ -23,45 +23,84 @@ Happy downloading! :)
 ## Usage
 ### Commands
 * apikey
-    	API key or password
+    - Description:
+    	- API key or password
+
 * credsfile
-    	File/Filepath with creds. If there is more than one, it will pick randomly per request. Use whitespace to separate out user and password
+    - Description:
+    	- File/Filepath with creds. If there is more than one, it will pick randomly per request. Use whitespace to separate out user and password
+
 * ducheck
-    	Disk Usage check in minutes (default 5)
+    - Description:
+    	- Disk Usage check in minutes (default 5)
+
 * duthreshold
-    	Set Disk usage threshold in % (default 85)
+    - Description:
+    	- Set Disk usage threshold in % (default 85)
+
 * duwarn
-    	Set Disk usage warning in % (default 70)
+    - Description:
+    	- Set Disk usage warning in % (default 70)
+
 * forcerepotype
-    	force a specific repo type rather than retrieving it from the repository configuration
+    - Description:
+    	- Force a specific repo type rather than retrieving it from the repository configuration
+
 * log
-    	Log level. Order of Severity: TRACE, DEBUG, INFO, WARN, ERROR, FATAL, PANIC (default "INFO")
+    - Description:
+    	- Log level. Order of Severity: TRACE, DEBUG, INFO, WARN, ERROR, FATAL, PANIC (default "INFO")
+
 * npmMD
-    	Only download NPM Metadata
+    - Description:
+    	- Only download NPM Metadata
+
 * queuemax
-    	Max queue size before sleeping (default 75)
+    - Description:
+    	- Max queue size before sleeping (default 75)
+
 * random
-    	Attempt to pull packages in random queue order
+    - Description:
+    	- Attempt to pull packages in random queue order
+
 * repo (required)
-    	Download Repository
+    - Description:
+    	- Download Repository name
+
 * reset
-    	Reset creds file
+    - Description:
+    	- Reset creds file
+
 * uapikey
-    	Upstream repository API key or password
+    - Description:
+    	- Upstream repository API key or password
+
 * url
-    	Binary Manager URL
+    - Description:
+    	- Binary Manager URL
+
 * user
-    	Username
+    - Description:
+    	- Username
+
 * uuser
-    	Upstream repository Username
+    - Description:
+    	- Upstream repository Username
+
 * v	
-        Print the current version and exit
+    - Description:
+        - Print the current version and exit
+
 * values
-    	Output stored values
+    - Description:
+    	- Output stored values
+
 * workers
-    	Number of workers (default 50)
+    - Description:
+    	- Number of workers (default 50)
+
 * workersleep
-    	Worker sleep period in seconds (default 5)
+    - Description:
+    	- Worker sleep period in seconds (default 5)
 
 ## Dependencies
 ```
