@@ -49,8 +49,19 @@ echo "Looks good?"
         case $yn in
             Yes)
                 echo $body > release.json 
-                curl -u $GIT_USER:$GIT_TOKEN -XPOST https://api.github.com/repos/lorenyeung/go-pkgdl/releases -H "Content-Type: application/json" -T release.json 
-                #rm release.json
+                curl -u $GIT_USER:$GIT_TOKEN -XPOST https://api.github.com/repos/lorenyeung/go-pkgdl/releases -H "Content-Type: application/json" -T release.json -o release-response.json
+                rm release.json
+                BINARIES=("pkgdl-darwin-x64" "pkgdl-linux-x64")
+                ASSET_URL=$(jq -r '.upload_url' release-response.json)
+                edited=$(echo $ASSET_URL | sed 's/{?name,label}//')
+
+                for BINARY in ${BINARIES[@]}; do
+                    URL="$edited?name=$BINARY&label=$BINARY"
+                    echo "uploading $BINARY to $URL"
+                    curl -T $BINARY "$URL" -H "Content-type: application/x-binary" -u $GIT_USER:$GIT_TOKEN
+                done
+                rm release-response.json
+                rm pkgdl-*
                 break;;
             No) echo "OK" ; break;;
         esac
