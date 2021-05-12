@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"go-pkgdl/auth"
+	"go-pkgdl/helpers"
 
 	"strings"
 	"time"
@@ -44,7 +45,7 @@ type Metadata struct {
 }
 
 //GetDockerImages Docker Engine API search
-func GetDockerImages(artURL string, artUser string, artApikey string, dockerRepo string, url string, base string, index int, component string, dockerWorkerQueue *list.List, random bool, workerSleepVar int) string {
+func GetDockerImages(artURL string, artUser string, artApikey string, dockerRepo string, url string, base string, index int, component string, dockerWorkerQueue *list.List, flags helpers.Flags) string {
 
 	//https://github.com/moby/moby/blob/master/client/image_search.go#L17
 	ctx := context.Background()
@@ -66,30 +67,30 @@ func GetDockerImages(artURL string, artUser string, artApikey string, dockerRepo
 		for j := 33; j <= 58; j++ {
 			dockerSearchStr := string(rune('A'-1+i)) + string(rune('A'-1+j))
 			randomSearchMap[dockerSearchStr] = "taken"
-			if !random {
+			if !flags.RandomVar {
 				log.Debug("Docker ordered search key:", dockerSearchStr)
 				results, err := cli.ImageSearch(ctx, dockerSearchStr, imageSearch)
 				if err != nil {
 					log.Error("Docker image search error:", err)
 				}
-				dockerSearch(dockerSearchStr, results, artURL, artUser, artApikey, dockerRepo, dockerWorkerQueue, workerSleepVar)
+				dockerSearch(dockerSearchStr, results, artURL, artUser, artApikey, dockerRepo, dockerWorkerQueue, flags)
 			}
 		}
 	}
 
 	//random search of docker images
-	if random {
+	if flags.RandomVar {
 		for key, value := range randomSearchMap {
 			log.Debug("Docker Random result search Key:", key, " Value:", value)
 			results, _ := cli.ImageSearch(ctx, key, imageSearch)
-			dockerSearch(key, results, artURL, artUser, artApikey, dockerRepo, dockerWorkerQueue, workerSleepVar)
+			dockerSearch(key, results, artURL, artUser, artApikey, dockerRepo, dockerWorkerQueue, flags)
 		}
 	}
 
 	return ""
 }
 
-func dockerSearch(search string, results []registry.SearchResult, artURL string, artUser string, artApikey string, dockerRepo string, dockerWorkerQueue *list.List, workerSleepVar int) {
+func dockerSearch(search string, results []registry.SearchResult, artURL string, artUser string, artApikey string, dockerRepo string, dockerWorkerQueue *list.List, flags helpers.Flags) {
 	//gets name, then loops through tags
 
 	for x := range results {
@@ -111,9 +112,9 @@ func dockerSearch(search string, results []registry.SearchResult, artURL string,
 			log.Trace("Docker Queue pushing into queue:", dockerMd.ManifestURLFile)
 			dockerWorkerQueue.PushBack(dockerMd)
 
-			for dockerWorkerQueue.Len() > 75 {
-				log.Debug("Docker worker queue is at ", dockerWorkerQueue.Len(), ", sleeping for ", workerSleepVar, " seconds...")
-				time.Sleep(time.Duration(workerSleepVar) * time.Second)
+			for dockerWorkerQueue.Len() > flags.SleepQueueMaxVar {
+				log.Debug("Docker worker queue is at ", dockerWorkerQueue.Len(), ", queue max is set to ", flags.SleepQueueMaxVar, ", sleeping for ", flags.WorkerSleepVar, " seconds...")
+				time.Sleep(time.Duration(flags.WorkerSleepVar) * time.Second)
 			}
 			log.Trace("Queue at:", dockerWorkerQueue.Len(), ", resuming docker worker queue")
 		}

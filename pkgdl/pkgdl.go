@@ -161,7 +161,7 @@ func main() {
 		log.Warn("Work in progress, only works against Docker Hub")
 		go func() {
 			log.Info("testing if it goes in here multiple times case repotype") //it does not
-			docker.GetDockerImages(creds.URL, creds.Username, creds.Apikey, flags.RepoVar, extractedURL, extractedURLStripped, 1, "", workQueue, flags.RandomVar, flags.WorkerSleepVar)
+			docker.GetDockerImages(creds.URL, creds.Username, creds.Apikey, flags.RepoVar, extractedURL, extractedURLStripped, 1, "", workQueue, flags)
 		}()
 
 	case "generic":
@@ -191,7 +191,7 @@ func main() {
 		go func() {
 			log.Info("rpm takes 10 seconds to init, please be patient")
 			//buggy. looks like there is a recursive search that screws it up
-			rpm.GetRpmHrefs(extractedURL, extractedURLStripped, workQueue)
+			rpm.GetRpmHrefs(extractedURL, extractedURLStripped, workQueue, flags)
 		}()
 
 	default:
@@ -278,7 +278,7 @@ func main() {
 			log.Info(repotype, " work queue is empty, sleeping for ", flags.WorkerSleepVar, " seconds...")
 			time.Sleep(time.Duration(flags.WorkerSleepVar) * time.Second)
 			count0++
-			if count0 > 10 {
+			if count0 > 50 {
 				log.Warn("Looks like nothing's getting put into the workqueue. You might want to enable -debug and take a look")
 			}
 			if workQueue.Len() > 0 {
