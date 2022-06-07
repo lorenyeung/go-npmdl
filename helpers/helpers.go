@@ -104,10 +104,10 @@ func PrintDownloadPercent(done chan int64, path string, total int64) {
 
 //Flags struct
 type Flags struct {
-	WorkersVar, WorkerSleepVar, DuCheckVar, SleepQueueMaxVar                                                                 int
-	StorageWarningVar, StorageThresholdVar                                                                                   float64
-	UsernameVar, ApikeyVar, URLVar, RepoVar, LogLevelVar, CredsFileVar, UpstreamUsernameVar, UpstreamApikeyVar, ForceTypeVar string
-	ResetVar, ValuesVar, RandomVar, NpmMetadataVar                                                                           bool
+	WorkersVar, WorkerSleepVar, DuCheckVar, SleepQueueMaxVar                                                                                                        int
+	StorageWarningVar, StorageThresholdVar                                                                                                                          float64
+	UsernameVar, ApikeyVar, URLVar, RepoVar, LogLevelVar, CredsFileVar, UpstreamUsernameVar, UpstreamApikeyVar, ForceTypeVar, PypiRegistryURLVar, PypiRepoSuffixVar string
+	ResetVar, ValuesVar, RandomVar, NpmMetadataVar                                                                                                                  bool
 }
 
 //LineCounter counts  how many lines are in a file
@@ -146,6 +146,8 @@ func SetFlags() Flags {
 	flag.StringVar(&flags.UpstreamApikeyVar, "uapikey", "", "Upstream API key or password")
 	flag.StringVar(&flags.URLVar, "url", "", "Binary Manager URL")
 	flag.StringVar(&flags.RepoVar, "repo", "", "Download Repository")
+	flag.StringVar(&flags.PypiRegistryURLVar, "pypiregistryurl", "", "")
+	flag.StringVar(&flags.PypiRepoSuffixVar, "pypireposuffix", "", "")
 	flag.BoolVar(&flags.ResetVar, "reset", false, "Reset creds file")
 	flag.BoolVar(&flags.ValuesVar, "values", false, "Output values")
 	flag.BoolVar(&flags.RandomVar, "random", false, "Attempt to pull packages in random queue order")

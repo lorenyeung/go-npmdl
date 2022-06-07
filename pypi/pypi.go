@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"go-pkgdl/helpers"
 	"net/http"
+	nurl "net/url"
 	"strings"
 	"time"
 
@@ -58,11 +59,19 @@ func checkPypi(t html.Token, registry string, registryBase string, url string, f
 			if a.Key == "href" && (strings.Contains(t.String(), "#sha256")) {
 				parts := strings.Split(a.Val, "#sha256")
 				hrefraw := parts[0]
+				//log.Info("href url:", url, "reg:", registry, "base:", registryBase, "raw:", hrefraw)
 				href := strings.TrimPrefix(hrefraw, url)
+				if href == hrefraw {
+					log.Warn("Url did not strip correctly, attempting other url")
+					u, _ := nurl.Parse(hrefraw)
+					href = strings.TrimPrefix(hrefraw, u.Scheme+"://"+u.Host)
+					log.Info(href, u.Scheme+u.Host)
+				}
+
 				file := strings.Split(parts[0], "/")
 
 				if pypiWorkerQueue.Len() > flags.SleepQueueMaxVar {
-					log.Debug("Docker worker queue is at ", pypiWorkerQueue.Len(), ", sleeping for ", flags.WorkerSleepVar, " seconds...")
+					log.Debug("Pypi worker queue is at ", pypiWorkerQueue.Len(), ", sleeping for ", flags.WorkerSleepVar, " seconds...")
 					time.Sleep(time.Duration(flags.WorkerSleepVar) * time.Second)
 				}
 
@@ -70,6 +79,7 @@ func checkPypi(t html.Token, registry string, registryBase string, url string, f
 				//add pypi metadata to queue
 				var pypiMd Metadata
 				pypiMd.URL = href
+				log.Info("href:", href)
 				pypiMd.File = file[len(file)-1]
 				pypiWorkerQueue.PushBack(pypiMd)
 				break

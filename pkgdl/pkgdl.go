@@ -139,7 +139,7 @@ func main() {
 	creds.Apikey = flags.ApikeyVar
 	creds.URL = flags.URLVar
 
-	var repotype, extractedURL, pypiRegistryURL, pypiRepoSuffix = checkTypeAndRepoParams(creds, flags.RepoVar)
+	var repotype, extractedURL, pypiRegistryURL, pypiRepoSuffix = checkTypeAndRepoParams(creds, flags)
 	pkgRepoDlFolder := repotype + "Downloads"
 
 	//case switch for different package types
@@ -309,10 +309,10 @@ func standardDownload(creds auth.Creds, dlURL string, file string, configPath st
 //func standardUpload()
 
 //Test if remote repository exists and is a remote
-func checkTypeAndRepoParams(creds auth.Creds, repoVar string) (string, string, string, string) {
-	repoCheckData, repoStatusCode, _ := auth.GetRestAPI("GET", true, creds.URL+"/api/repositories/"+repoVar, creds.Username, creds.Apikey, "", nil, 1)
+func checkTypeAndRepoParams(creds auth.Creds, flags helpers.Flags) (string, string, string, string) {
+	repoCheckData, repoStatusCode, _ := auth.GetRestAPI("GET", true, creds.URL+"/api/repositories/"+flags.RepoVar, creds.Username, creds.Apikey, "", nil, 1)
 	if repoStatusCode != 200 {
-		log.Error("Repo", repoVar, "does not exist.")
+		log.Error("Repo", flags.RepoVar, "does not exist.")
 		os.Exit(0)
 	}
 	var result map[string]interface{}
@@ -321,11 +321,20 @@ func checkTypeAndRepoParams(creds auth.Creds, repoVar string) (string, string, s
 	if result["rclass"] == "local" && result["packageType"].(string) == "generic" {
 		return result["packageType"].(string), "", "", ""
 	} else if result["rclass"] != "remote" {
-		log.Error(repoVar, "is a", result["rclass"], "repository and not a remote repository.")
+		log.Error(flags.RepoVar, "is a", result["rclass"], "repository and not a remote repository.")
 		//maybe here.
 		os.Exit(0)
 	}
 	if result["packageType"].(string) == "pypi" {
+		if result["pyPIRegistryUrl"] == nil || result["pyPIRepositorySuffix"] == nil {
+			log.Warn("pypi repo setting pyPIRegistryUrl/pyPIRepositorySuffix is nil, likely running older version.")
+			if flags.PypiRegistryURLVar == "" || flags.PypiRepoSuffixVar == "" {
+				log.Error("please manually set -pypiregistryurl and -pypireposuffix")
+				os.Exit(0)
+			} else {
+				return result["packageType"].(string), result["url"].(string), flags.PypiRegistryURLVar, flags.PypiRepoSuffixVar
+			}
+		}
 		return result["packageType"].(string), result["url"].(string), result["pyPIRegistryUrl"].(string), result["pyPIRepositorySuffix"].(string)
 	}
 	return result["packageType"].(string), result["url"].(string), "", ""
