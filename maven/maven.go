@@ -5,6 +5,7 @@ import (
 	"go-pkgdl/helpers"
 	"net/http"
 	"strings"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 
@@ -18,7 +19,7 @@ type Metadata struct {
 }
 
 //GetMavenHrefs parse hrefs for Maven files
-func GetMavenHrefs(url string, base string, MavenWorkerQueue *list.List) string {
+func GetMavenHrefs(url string, base string, MavenWorkerQueue *list.List, flags helpers.Flags) string {
 	resp, err := http.Get(url)
 	// this needs to be threaded better..
 	helpers.Check(err, false, "HTTP GET error", helpers.Trace())
@@ -46,17 +47,17 @@ func GetMavenHrefs(url string, base string, MavenWorkerQueue *list.List) string 
 					if a.Key == "href" && (strings.HasSuffix(a.Val, "/")) {
 						strip := strings.TrimPrefix(a.Val, ":")
 						log.Debug("strip:", url+strip)
-						GetMavenHrefs(url+strip, base, MavenWorkerQueue)
+						GetMavenHrefs(url+strip, base, MavenWorkerQueue, flags)
 						break
 					}
 				}
-				checkMaven(t, url, base, MavenWorkerQueue)
+				checkMaven(t, url, base, MavenWorkerQueue, flags)
 			}
 		}
 	}
 }
 
-func checkMaven(t html.Token, url string, base string, MavenWorkerQueue *list.List) {
+func checkMaven(t html.Token, url string, base string, MavenWorkerQueue *list.List, flags helpers.Flags) {
 	//need to consider downloading pom.xml too
 	if strings.Contains(t.String(), ".jar") || strings.Contains(t.String(), ".pom") {
 		for _, a := range t.Attr {
@@ -65,7 +66,11 @@ func checkMaven(t html.Token, url string, base string, MavenWorkerQueue *list.Li
 				hrefraw := url + a.Val
 				href := strings.TrimPrefix(hrefraw, base)
 
-				log.Info("queuing download", href, a.Val, MavenWorkerQueue.Len())
+				if MavenWorkerQueue.Len() > flags.SleepQueueMaxVar {
+					log.Debug("Maven worker queue is at ", MavenWorkerQueue.Len(), ", sleeping for ", flags.WorkerSleepVar, " seconds...")
+					time.Sleep(time.Duration(flags.WorkerSleepVar) * time.Second)
+				}
+				log.Info("queuing download", href, a.Val, " queue length:", MavenWorkerQueue.Len())
 
 				//add Maven metadata to queue
 				var MavenMd Metadata

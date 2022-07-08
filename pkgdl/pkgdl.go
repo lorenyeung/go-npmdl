@@ -175,7 +175,7 @@ func main() {
 
 	case "maven":
 		go func() {
-			maven.GetMavenHrefs(extractedURL, extractedURLStripped, workQueue)
+			maven.GetMavenHrefs(extractedURL, extractedURLStripped, workQueue, flags)
 		}()
 
 	case "npm":

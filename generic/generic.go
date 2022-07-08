@@ -97,7 +97,7 @@ func checkGeneric(t html.Token, url string, base string, GenericWorkerQueue *lis
 				hrefraw := url + a.Val
 				href := strings.TrimPrefix(hrefraw, base)
 
-				log.Info("queuing download ", href, a.Val, GenericWorkerQueue.Len())
+				log.Info("queuing download ", href, a.Val, " queue length:", GenericWorkerQueue.Len())
 
 				dockerString := strings.Split(href, "/")
 
