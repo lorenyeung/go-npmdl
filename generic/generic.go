@@ -102,13 +102,15 @@ func checkGeneric(t html.Token, url string, base string, GenericWorkerQueue *lis
 				dockerString := strings.Split(href, "/")
 
 				var GenericMd Metadata
-				GenericMd.Image = dockerString[1]
-				GenericMd.Tag = dockerString[2]
+				GenericMd.Tag = dockerString[len(dockerString)-2]
+				GenericMd.Image = strings.TrimSuffix(href, "/"+GenericMd.Tag+"/manifest.json")
+				GenericMd.Image = strings.TrimPrefix(GenericMd.Image, "/")
 				//log.Error(dockerString)
 				//GenericMd.ManifestURLAPI = flags.URLVar + "/api/docker/" + genericRepo + "/v2/" + GenericMd.Image + "/manifests/" + GenericMd.Tag
 				GenericMd.ManifestURLAPI = flags.URLVar + "/" + genericRepo + "/" + GenericMd.Image + "/" + GenericMd.Tag + "/manifest.json"
 				GenericMd.ManifestURLFile = flags.URLVar + "/" + genericRepo + "/" + GenericMd.Image + "/" + GenericMd.Tag + "/manifest.json"
-				log.Info("Docker Queue pushing into queue:", GenericMd.ManifestURLFile)
+				log.Info("Generic Docker Queue pushing into queue:", GenericMd.ManifestURLFile)
+				log.Debug("Generic Docker Queue pushing:", GenericMd.Image, " tag:", GenericMd.Tag)
 				GenericWorkerQueue.PushBack(GenericMd)
 
 				for GenericWorkerQueue.Len() > 75 {

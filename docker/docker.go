@@ -47,6 +47,9 @@ type Metadata struct {
 //GetDockerImages Docker Engine API search
 func GetDockerImages(artURL string, artUser string, artApikey string, dockerRepo string, url string, base string, index int, component string, dockerWorkerQueue *list.List, flags helpers.Flags) string {
 
+	//search upstream only
+
+	//search internet
 	//https://github.com/moby/moby/blob/master/client/image_search.go#L17
 	ctx := context.Background()
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())

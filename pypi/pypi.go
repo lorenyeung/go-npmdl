@@ -65,7 +65,7 @@ func checkPypi(t html.Token, registry string, registryBase string, url string, f
 					log.Warn("Url did not strip correctly, attempting other url")
 					u, _ := nurl.Parse(hrefraw)
 					href = strings.TrimPrefix(hrefraw, u.Scheme+"://"+u.Host)
-					log.Info(href, u.Scheme+u.Host)
+					//log.Info(href, u.Scheme+u.Host)
 				}
 
 				file := strings.Split(parts[0], "/")
@@ -79,7 +79,7 @@ func checkPypi(t html.Token, registry string, registryBase string, url string, f
 				//add pypi metadata to queue
 				var pypiMd Metadata
 				pypiMd.URL = href
-				log.Info("href:", href)
+				//log.Info("href:", href)
 				pypiMd.File = file[len(file)-1]
 				pypiWorkerQueue.PushBack(pypiMd)
 				break
