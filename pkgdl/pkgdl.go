@@ -9,6 +9,7 @@ import (
 	"go-pkgdl/auth"
 	"go-pkgdl/debian"
 	"go-pkgdl/docker"
+	"go-pkgdl/gems"
 	"go-pkgdl/generic"
 	"go-pkgdl/helpers"
 	"go-pkgdl/maven"
@@ -45,7 +46,7 @@ func main() {
 		return
 	}
 
-	supportedTypes := [7]string{"debian", "docker", "generic", "maven", "npm", "pypi", "rpm"}
+	supportedTypes := [8]string{"debian", "docker", "generic", "maven", "npm", "pypi", "rpm", "gems"}
 	usr, err := user.Current()
 	if err != nil {
 		log.Fatal(err)
@@ -193,6 +194,12 @@ func main() {
 			//buggy. looks like there is a recursive search that screws it up
 			rpm.GetRpmHrefs(extractedURL, extractedURLStripped, workQueue, flags)
 		}()
+	case "gems":
+		go func() {
+			log.Info("ruby takes 10 seconds to init, please be patient")
+			//buggy. looks like there is a recursive search that screws it up
+			gems.GetGemsHrefs(creds, extractedURL, extractedURLStripped, workQueue, flags)
+		}()
 
 	default:
 		log.Println("Unsupported package type", repotype, ". We currently support the following:", supportedTypes)
@@ -240,6 +247,10 @@ func main() {
 				case "docker":
 					md := s.(docker.Metadata)
 					docker.DlDockerLayers(creds, md, flags.RepoVar, i, false)
+
+				case "gems":
+					md := s.(gems.Metadata)
+					standardDownload(creds, md.URL, md.File, configPath, pkgRepoDlFolder, flags.RepoVar)
 
 				case "generic":
 					md := s.(generic.Metadata)
