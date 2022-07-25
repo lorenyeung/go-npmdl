@@ -104,10 +104,10 @@ func PrintDownloadPercent(done chan int64, path string, total int64) {
 
 //Flags struct
 type Flags struct {
-	WorkersVar, WorkerSleepVar, DuCheckVar, SleepQueueMaxVar                                                                                                        int
+	WorkersVar, WorkerSleepVar, DuCheckVar, PkgLimitVar, SleepQueueMaxVar                                                                                           int
 	StorageWarningVar, StorageThresholdVar                                                                                                                          float64
 	UsernameVar, ApikeyVar, URLVar, RepoVar, LogLevelVar, CredsFileVar, UpstreamUsernameVar, UpstreamApikeyVar, ForceTypeVar, PypiRegistryURLVar, PypiRepoSuffixVar string
-	ResetVar, ValuesVar, RandomVar, NpmMetadataVar                                                                                                                  bool
+	ResetVar, ValuesVar, RandomVar, NpmMetadataVar, NpmRegistryOldVar                                                                                               bool
 }
 
 //LineCounter counts  how many lines are in a file
@@ -130,11 +130,37 @@ func LineCounter(r io.Reader) (int, error) {
 	}
 }
 
+func GetPreString(flags Flags) string {
+	randomSearchMap := make(map[string]string)
+
+	//search for files via looping through permuations of two letters, alpabetised
+	for i := 33; i <= 58; i++ {
+		for j := 33; j <= 58; j++ {
+			searchStr := string(rune('A'-1+i)) + string(rune('A'-1+j))
+			randomSearchMap[searchStr] = "taken"
+			if !flags.RandomVar {
+				log.Debug("Ordered search key:", searchStr)
+				return searchStr
+			}
+		}
+	}
+
+	//random search of files
+	if flags.RandomVar {
+		for key, value := range randomSearchMap {
+			log.Debug("Random result search Key:", key, " Value:", value)
+			return key
+		}
+	}
+	return ""
+}
+
 //SetFlags function
 func SetFlags() Flags {
 	var flags Flags
 	flag.StringVar(&flags.LogLevelVar, "log", "INFO", "Order of Severity: TRACE, DEBUG, INFO, WARN, ERROR, FATAL, PANIC")
 	flag.IntVar(&flags.WorkersVar, "workers", 50, "Number of workers")
+	flag.IntVar(&flags.PkgLimitVar, "pkglimit", 0, "Number of packages to download. Default unlimited")
 	flag.IntVar(&flags.SleepQueueMaxVar, "queuemax", 75, "Max queued size before sleeping")
 	flag.IntVar(&flags.WorkerSleepVar, "workersleep", 5, "Worker sleep period in seconds")
 	flag.IntVar(&flags.DuCheckVar, "ducheck", 5, "Disk Usage check in minutes")
@@ -154,6 +180,7 @@ func SetFlags() Flags {
 	flag.BoolVar(&flags.NpmMetadataVar, "npmMD", false, "Only download NPM Metadata")
 	flag.StringVar(&flags.CredsFileVar, "credsfile", "", "File with creds. If there is more than one, it will pick randomly per request. Use whitespace to separate out user and password")
 	flag.StringVar(&flags.ForceTypeVar, "forcerepotype", "", "force repo type rather than get from repository")
+	flag.BoolVar(&flags.NpmRegistryOldVar, "npmold", false, "use file rather than API")
 	flag.Parse()
 	return flags
 }

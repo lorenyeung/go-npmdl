@@ -180,8 +180,15 @@ func main() {
 		}()
 
 	case "npm":
-		log.Info("testing if it goes in here multiple times case repotype")
-		npm.GetNPMList(configPath, workQueue)
+		if flags.NpmRegistryOldVar {
+			log.Info("Using old method")
+			npm.GetNPMList(configPath, workQueue)
+		} else {
+			log.Info("Using search method")
+			go func() {
+				npm.GetNPMListNew(creds, flags, workQueue, extractedURL)
+			}()
+		}
 
 	case "pypi":
 		go func() {
@@ -218,6 +225,7 @@ func main() {
 	//work queue
 	var ch = make(chan interface{}, flags.WorkersVar+1)
 	var wg sync.WaitGroup
+	workQueueCount := 0
 	for i := 0; i < flags.WorkersVar; i++ {
 		go func(i int) {
 			for {
@@ -228,6 +236,12 @@ func main() {
 					wg.Done()
 				}
 				log.Debug("worker ", i, " starting job")
+				if workQueueCount > flags.PkgLimitVar && flags.PkgLimitVar != 0 {
+					log.Info("Reached limit of ", flags.PkgLimitVar, " exiting now.")
+					os.Exit(0)
+				} else {
+					workQueueCount++
+				}
 
 				if flags.CredsFileVar != "" {
 					//pick random user and password from list

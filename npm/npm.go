@@ -3,12 +3,14 @@ package npm
 import (
 	"container/list"
 	"encoding/json"
+	"fmt"
 	"go-pkgdl/auth"
 	"go-pkgdl/helpers"
 	"io/ioutil"
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -67,6 +69,74 @@ func GetNPMMetadata(creds auth.Creds, URL, packageIndex, packageName, configPath
 	}
 }
 
+func GetNPMListNew(creds auth.Creds, flags helpers.Flags, npmWorkerQueue *list.List, url string) {
+	randomSearchMap := make(map[string]string)
+
+	//search for files via looping through permuations of two letters, alpabetised
+	for i := 33; i <= 58; i++ {
+		for j := 33; j <= 58; j++ {
+			searchStr := string(rune('A'-1+i)) + string(rune('A'-1+j))
+			randomSearchMap[searchStr] = "taken"
+			if !flags.RandomVar {
+				log.Debug("Ordered search key:", searchStr)
+				npmSearch(creds, flags, npmWorkerQueue, url, searchStr)
+			}
+		}
+	}
+
+	//random search of files
+	if flags.RandomVar {
+		for key, value := range randomSearchMap {
+			log.Debug("Random result search Key:", key, " Value:", value)
+			npmSearch(creds, flags, npmWorkerQueue, url, key)
+		}
+	}
+}
+
+type npmDataObj struct {
+	Data []npmDataPkg `json:"objects"`
+}
+
+type npmDataPkg struct {
+	Package npmData `json:"package"`
+}
+
+type npmData struct {
+	Name string `json:"name"`
+}
+
+func npmSearch(creds auth.Creds, flags helpers.Flags, npmWorkerQueue *list.List, url string, searchStr string) {
+	pg := 1
+	size := 250
+	counter := 0
+	for {
+		data, _, _ := auth.GetRestAPI("GET", false, url+"-/v1/search?text="+searchStr+"&from="+strconv.Itoa(pg)+"&size="+strconv.Itoa(size), "", "", "", nil, 0)
+		var npmSearchApiData npmDataObj
+		err := json.Unmarshal(data, &npmSearchApiData)
+		if err != nil {
+			fmt.Println(err)
+		}
+		if len(npmSearchApiData.Data) == 0 {
+			log.Info("no more pages for ", searchStr, " moving on to next key")
+			return
+		}
+		//log.Info("Found ", len(npmSearchApiData), " gems on page ", pg)
+		for i := range npmSearchApiData.Data {
+			log.Info("Found NPM:", npmSearchApiData.Data[i].Package.Name)
+			var npmMd Metadata
+			npmMd.ID = strconv.Itoa(counter)
+			counter++
+			npmMd.Package = npmSearchApiData.Data[i].Package.Name
+			if npmWorkerQueue.Len() > flags.SleepQueueMaxVar {
+				log.Debug("NPM worker queue is at ", npmWorkerQueue.Len(), ", sleeping for ", flags.WorkerSleepVar, " seconds...")
+				time.Sleep(time.Duration(flags.WorkerSleepVar) * time.Second)
+			}
+			npmWorkerQueue.PushBack(npmMd)
+		}
+		pg = pg + size
+	}
+}
+
 //GetNPMList function to convert raw list into readable text file
 func GetNPMList(configPath string, npmWorkQueue *list.List) {
 	if _, err := os.Stat(configPath + "all-npm.json"); os.IsNotExist(err) {
@@ -82,6 +152,7 @@ func GetNPMList(configPath string, npmWorkQueue *list.List) {
 		t := strconv.Itoa(i)
 		result.ID = t
 		result.Package = j.ID
+		log.Debug("Get NPM list t:", result.ID, " ID:", result.Package)
 		npmWorkQueue.PushBack(result)
 	}
 }
