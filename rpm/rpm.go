@@ -19,6 +19,7 @@ type Metadata struct {
 }
 
 var junk int
+var junkUrls = make(map[string]int)
 
 //GetRpmHrefs parse hrefs for RPM files
 func GetRpmHrefs(url string, base string, RpmWorkerQueue *list.List, flags helpers.Flags) string {
@@ -53,7 +54,16 @@ func GetRpmHrefs(url string, base string, RpmWorkerQueue *list.List, flags helpe
 						break
 					}
 				}
-				junk = checkRpm(t, url, base, RpmWorkerQueue, flags, junk)
+				//try to skip junk urls
+				for i := range t.Attr {
+					log.Debug("stuff inside html", t.Attr[i])
+					if t.Attr[i].Key == "href" {
+						if junkUrls[t.Attr[i].Val] < 2 {
+							junk = checkRpm(t, url, base, RpmWorkerQueue, flags, junk)
+						}
+					}
+				}
+
 			}
 		}
 	}
@@ -89,7 +99,13 @@ func checkRpm(t html.Token, url string, base string, rpmWorkerQueue *list.List, 
 			log.Info("found ", junk, "+ files that aren't .rpm, ignoring them")
 		}
 		junk++
-
+		for i := range t.Attr {
+			log.Debug("stuff inside html", t.Attr[i])
+			if t.Attr[i].Key == "href" {
+				junkUrls[t.Attr[i].Val]++
+				log.Debug(t.Attr[i].Val, " val", junkUrls[t.Attr[i].Val])
+			}
+		}
 		log.Debug("ignoring non .rpm URL received:", t.Attr)
 		return junk
 	}
